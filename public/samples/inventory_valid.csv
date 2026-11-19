@@ -1,0 +1,37 @@
+product_id,product_name,date,ordered_quantity,sold_quantity,category,current_stock,supplier_lead_time,unit_cost
+P-1025,Oat Milk Original 1.89 L,2025-11-01,96,95,Dairy,,3,3.85
+P-1025,Oat Milk Original 1.89 L,2025-12-01,108,101,Dairy,,3,3.85
+P-1025,Oat Milk Original 1.89 L,2026-01-01,96,96,Dairy,,3,3.85
+P-1025,Oat Milk Original 1.89 L,2026-02-01,96,94,Dairy,,3,3.85
+P-1025,Oat Milk Original 1.89 L,2026-03-01,108,102,Dairy,,3,3.85
+P-1025,Oat Milk Original 1.89 L,2026-04-01,108,105,Dairy,,3,3.85
+P-1025,Oat Milk Original 1.89 L,2026-05-01,96,98,Dairy,,3,3.85
+P-1025,Oat Milk Original 1.89 L,2026-06-01,108,100,Dairy,,3,3.85
+P-1025,Oat Milk Original 1.89 L,2026-07-01,108,109,Dairy,,3,3.85
+P-1025,Oat Milk Original 1.89 L,2026-08-01,108,108,Dairy,,3,3.85
+P-1025,Oat Milk Original 1.89 L,2026-09-01,108,102,Dairy,,3,3.85
+P-1025,Oat Milk Original 1.89 L,2026-10-01,108,108,Dairy,35,3,3.85
+P-1026,Sourdough Loaf,2025-11-01,150,146,Bakery,,1,2.95
+P-1026,Sourdough Loaf,2025-12-01,150,144,Bakery,,1,2.95
+P-1026,Sourdough Loaf,2026-01-01,140,135,Bakery,,1,2.95
+P-1026,Sourdough Loaf,2026-02-01,150,141,Bakery,,1,2.95
+P-1026,Sourdough Loaf,2026-03-01,160,151,Bakery,,1,2.95
+P-1026,Sourdough Loaf,2026-04-01,150,144,Bakery,,1,2.95
+P-1026,Sourdough Loaf,2026-05-01,140,138,Bakery,,1,2.95
+P-1026,Sourdough Loaf,2026-06-01,150,148,Bakery,,1,2.95
+P-1026,Sourdough Loaf,2026-07-01,160,153,Bakery,,1,2.95
+P-1026,Sourdough Loaf,2026-08-01,150,144,Bakery,,1,2.95
+P-1026,Sourdough Loaf,2026-09-01,150,143,Bakery,,1,2.95
+P-1026,Sourdough Loaf,2026-10-01,160,155,Bakery,120,1,2.95
+P-1013,Whole Wheat Bread,2025-11-01,252,243,Bakery,,1,2.1
+P-1013,Whole Wheat Bread,2025-12-01,240,227,Bakery,,1,2.1
+P-1013,Whole Wheat Bread,2026-01-01,240,225,Bakery,,1,2.1
+P-1013,Whole Wheat Bread,2026-02-01,252,243,Bakery,,1,2.1
+P-1013,Whole Wheat Bread,2026-03-01,252,243,Bakery,,1,2.1
+P-1013,Whole Wheat Bread,2026-04-01,240,226,Bakery,,1,2.1
+P-1013,Whole Wheat Bread,2026-05-01,240,233,Bakery,,1,2.1
+P-1013,Whole Wheat Bread,2026-06-01,264,250,Bakery,,1,2.1
+P-1013,Whole Wheat Bread,2026-07-01,252,241,Bakery,,1,2.1
+P-1013,Whole Wheat Bread,2026-08-01,240,228,Bakery,,1,2.1
+P-1013,Whole Wheat Bread,2026-09-01,252,243,Bakery,,1,2.1
+P-1013,Whole Wheat Bread,2026-10-01,264,254,Bakery,150,1,2.1
