@@ -39,7 +39,7 @@ Suggested label is help wanted.
 
 ## Launch post draft
 
-I’m putting together an evaluation preview of Retail Intelligence, a grocery inventory project originally built by faraz-hsn for a University of Calgary course. The original sample-data dashboard is still there. The self-hosted preview adds separate store accounts, validated inventory CSVs, sales history, and a reorder calculator.
+I’m putting together an evaluation preview of Retail Intelligence, a grocery inventory project I developed for a University of Calgary course and first shared through faraz-hsn’s repository. The original sample-data dashboard is still there. The self-hosted preview adds separate store accounts, validated inventory CSVs, sales history, and a reorder calculator.
 
 If you work with grocery inventory, I’d like to know how your exports represent corrections and dated stock counts. Try the demo with synthetic data and share what you would need before using a tool like this at work. Developers interested in inventory data or accessibility can start with the contributor issues.
 

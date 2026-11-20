@@ -2,7 +2,7 @@
 
 Retail Intelligence helps grocery-store managers import sales and stock data, review product history, and calculate how many units to reorder. This is an **inventory evaluation preview**. It includes a browser demo and a self-hosted inventory workflow.
 
-Original project by [faraz-hsn](https://github.com/faraz-hsn/AI-Inventory) for CPSC 598 Software Entrepreneurship at the University of Calgary. The original repository does not declare a software license.
+Amirali Moradi developed Retail Intelligence for CPSC 598 Software Entrepreneurship at the University of Calgary. The project first appeared in the [repository published by faraz-hsn](https://github.com/faraz-hsn/AI-Inventory). This repository preserves that commit history. The original repository does not declare a software license.
 
 ## Try the sample-data demo
 
