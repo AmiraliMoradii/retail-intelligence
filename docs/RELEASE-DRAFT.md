@@ -1,46 +1,58 @@
-# Inventory evaluation preview
+# Inventory Evaluation Preview
 
 ## GitHub metadata
 
 **Description**
+
 Grocery inventory evaluation app with store-scoped CSV imports, sales history, reorder calculations, and a sample-data demo.
 
 **Topics**
+
 inventory-management, retail-analytics, react, typescript, sqlite, csv-import
 
-**Release summary**
-This preview adds a self-hosted store inventory workflow alongside the original browser demo. Store managers can import CSVs and review product history. Store members can calculate reorder quantities using on-hand stock and manually entered demand. The preview uses SQLite and locally provisioned accounts. Camera analysis and AI forecasting remain demo features.
+**Release notes for v0.3.0-preview.1**
 
-## Contributor issue drafts
+- Open a synthetic grocery store in the browser without creating an account.
+- Try valid and invalid inventory CSVs, inspect product history, and check the reorder calculation.
+- Run the self-hosted inventory workflow with SQLite and store-specific access.
+- Contribute under the MIT license. Aisle traffic and demand forecasts remain simulated in the demo.
+
+## Contributor issues
+
+The [GitHub issue tracker](https://github.com/AmiraliMoradii/retail-intelligence/issues) contains the current assignments and status.
 
 ### Add a sample CSV for dated stock updates
 
-Suggested labels are documentation and good first issue.
+Labels are `documentation` and `good first issue`.
 
-- Add synthetic fixtures showing an initial stock count, a newer snapshot for the same product, and a late file with an older count.
-- Document the resulting stock date and monthly sales totals for each import.
-- Use the same SKUs and dates in the fixture and walkthrough.
+- Add synthetic fixtures for an initial stock count, a newer count for the same SKU, and a late file containing an older count.
+- Document the resulting stock date and monthly totals after each import.
+- Use the same SKUs and dates in the fixtures and walkthrough.
 
-### Verify the store inventory UI in CI
+### Cover viewer permissions in the browser
 
-Suggested label is help wanted.
+Label is `help wanted`.
 
-- Start the app with a temporary database and two synthetic stores.
-- Cover manager login, an invalid and valid import, product history, a reorder result, refresh, and logout.
-- Run a narrow viewport case and retain browser diagnostics on failure. Keep test credentials and database files out of artifacts.
+- Provision a viewer and manager in the browser test fixture.
+- Sign in as the viewer and verify that the import form is absent and saved product history and reorder calculation still work.
+- Verify that switching between viewer and manager sessions does not display another user's inventory.
 
-### Test inventory backup and restore
+### Rehearse inventory recovery on the pilot host
 
-Suggested label is help wanted.
+Label is `help wanted`.
 
-- Document how to back up SQLite while writes are active, including what must happen to WAL files.
-- Restore to a temporary location and verify that accounts, memberships, and imported sales are available.
-- Document session handling during recovery and record a successful restore drill.
+- Run the documented backup and recovery procedure on staging with two synthetic stores.
+- Record elapsed recovery time and reconcile store totals and a known reorder calculation.
+- Confirm that sessions issued before the restore can no longer access the inventory.
 
-## Launch post draft
+## Launch post for developers
 
-I’m putting together an evaluation preview of Retail Intelligence, a grocery inventory project I developed for a University of Calgary course and first shared through faraz-hsn’s repository. The original sample-data dashboard is still there. The self-hosted preview adds separate store accounts, validated inventory CSVs, sales history, and a reorder calculator.
+I built Retail Intelligence for a University of Calgary course and am sharing an evaluation preview. The online demo lets you import a sample inventory CSV and see its effect on product history and reorder quantities. There is also a self-hosted workflow with SQLite and store-level access. If you are interested in inventory tooling, the dated stock CSV issue is a small place to start. I would also welcome reproducible accessibility or data import reports.
 
-If you work with grocery inventory, I’d like to know how your exports represent corrections and dated stock counts. Try the demo with synthetic data and share what you would need before using a tool like this at work. Developers interested in inventory data or accessibility can start with the contributor issues.
+## Feedback request for store managers
 
-Add the verified fork and demo URLs before posting.
+I’m testing a grocery inventory tool that imports monthly sales and stock counts from CSV. The sample store shows how an import changes product history and the reorder calculation. When you correct a sale or stock count from a previous month, how does your export represent the change? A description or made-up example is enough.
+
+## Measure participation
+
+The pre-launch check on November 20, 2026 recorded 0 stars, 0 forks, and an empty issue tracker before the three maintainer issues were opened. Immediately before sharing the demo, record a fresh snapshot including issues with outside participation and outside pull requests. Compare on days 7, 14, and 30. If the owner records GitHub traffic, retain each dated 14-day snapshot so the early activity remains visible. Note reproducible issues and store feedback alongside the counts.

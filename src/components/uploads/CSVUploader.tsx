@@ -33,6 +33,7 @@ import {
 } from "@/services/csvService";
 import { formatBytes, formatNumber } from "@/utils/formatters";
 import { cn } from "@/lib/utils";
+import { PUBLIC_DEMO } from "@/config/demo";
 
 export const SAMPLE_FILES = [
   { file: "inventory_valid.csv", label: "Valid inventory file", hint: "36 rows · 3 products" },
@@ -56,7 +57,7 @@ export interface CSVUploaderProps {
 
 export function CSVUploader({ onImport, successActions, confirmLabel = "Confirm import", className, hideSamples }: CSVUploaderProps) {
   const inputRef = React.useRef<HTMLInputElement>(null);
-  const chooseFileRef = React.useRef<HTMLButtonElement>(null);
+  const selectFileRef = React.useRef<HTMLButtonElement>(null);
   const outcomeRef = React.useRef<HTMLDivElement>(null);
   const focusOnReset = React.useRef(false);
   const busy = React.useRef(false);
@@ -70,7 +71,7 @@ export function CSVUploader({ onImport, successActions, confirmLabel = "Confirm 
   React.useEffect(() => {
     if (phase === "idle" && focusOnReset.current) {
       focusOnReset.current = false;
-      chooseFileRef.current?.focus();
+      selectFileRef.current?.focus();
     }
     if (phase === "parsed" || phase === "imported") outcomeRef.current?.focus();
   }, [phase, importFailed]);
@@ -119,7 +120,7 @@ export function CSVUploader({ onImport, successActions, confirmLabel = "Confirm 
     event.preventDefault();
     setDragOver(false);
     const selected = event.dataTransfer.files?.[0];
-    if (phase === "idle" && selected) void readFile(selected.name, async () => selected);
+    if (!PUBLIC_DEMO && phase === "idle" && selected) void readFile(selected.name, async () => selected);
   };
 
   const confirm = async () => {
@@ -146,20 +147,22 @@ export function CSVUploader({ onImport, successActions, confirmLabel = "Confirm 
 
   return (
     <div className={cn("space-y-4", className)}>
-      <input
-        ref={inputRef}
-        type="file"
-        accept=".csv,text/csv"
-        hidden
-        aria-label="Inventory CSV file"
-        onChange={onInputChange}
-      />
+      {!PUBLIC_DEMO && (
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".csv,text/csv"
+          hidden
+          aria-label="Inventory CSV file"
+          onChange={onInputChange}
+        />
+      )}
 
       {(phase === "idle" || phase === "reading") && (
         <div
           onDragOver={(e) => {
             e.preventDefault();
-            if (phase === "idle") setDragOver(true);
+            if (!PUBLIC_DEMO && phase === "idle") setDragOver(true);
           }}
           onDragLeave={() => setDragOver(false)}
           onDrop={onDrop}
@@ -179,13 +182,26 @@ export function CSVUploader({ onImport, successActions, confirmLabel = "Confirm 
               <div className="mb-3 flex size-12 items-center justify-center rounded-full bg-card text-primary shadow-sm">
                 <UploadCloud className="size-6" aria-hidden="true" />
               </div>
-              <p className="text-sm font-semibold">Drag and drop your inventory CSV here</p>
-              <p className="mt-1 text-xs text-muted-foreground">CSV only · up to {formatBytes(MAX_CSV_BYTES)} · first 10 rows are previewed before import</p>
+              <p className="text-sm font-semibold">
+                {PUBLIC_DEMO ? "Choose a bundled sample" : "Drag and drop your inventory CSV here"}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {PUBLIC_DEMO
+                  ? "You can preview the rows before importing."
+                  : `CSV only · up to ${formatBytes(MAX_CSV_BYTES)} · first 10 rows are previewed before import`}
+              </p>
               <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-                <Button ref={chooseFileRef} type="button" onClick={() => inputRef.current?.click()}>
-                  <FileSpreadsheet /> Choose file
-                </Button>
-                {!hideSamples && <SampleMenu onPick={(name) => void readFile(name, () => loadSampleCsv(name))} />}
+                {!PUBLIC_DEMO && (
+                  <Button ref={selectFileRef} type="button" onClick={() => inputRef.current?.click()}>
+                    <FileSpreadsheet /> Choose file
+                  </Button>
+                )}
+                {(!hideSamples || PUBLIC_DEMO) && (
+                  <SampleMenu
+                    triggerRef={PUBLIC_DEMO ? selectFileRef : undefined}
+                    onPick={(name) => void readFile(name, () => loadSampleCsv(name))}
+                  />
+                )}
               </div>
             </>
           )}
@@ -245,11 +261,15 @@ export function CSVUploader({ onImport, successActions, confirmLabel = "Confirm 
                   {issues.length > 6 && <li>…and {issues.length - 6} more.</li>}
                 </ul>
               )}
-              <p className="mt-3 text-sm text-muted-foreground">Fix the file in your spreadsheet app, save it as CSV, and upload it again.</p>
+              <p className="mt-3 text-sm text-muted-foreground">
+                {PUBLIC_DEMO ? "Start over to choose another sample." : "Fix the file in your spreadsheet app, save it as CSV, and upload it again."}
+              </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <Button size="sm" onClick={() => inputRef.current?.click()}>
-                  <UploadCloud /> Upload corrected file
-                </Button>
+                {!PUBLIC_DEMO && (
+                  <Button size="sm" onClick={() => inputRef.current?.click()}>
+                    <UploadCloud /> Upload corrected file
+                  </Button>
+                )}
                 <Button size="sm" variant="outline" onClick={reset}>
                   <RotateCcw /> Start over
                 </Button>
@@ -385,11 +405,14 @@ export function CSVUploader({ onImport, successActions, confirmLabel = "Confirm 
   );
 }
 
-function SampleMenu({ onPick }: { onPick: (file: string) => void }) {
+function SampleMenu({ onPick, triggerRef }: {
+  onPick: (file: string) => void;
+  triggerRef?: React.Ref<HTMLButtonElement>;
+}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="outline">
+        <Button ref={triggerRef} type="button" variant="outline">
           Try a sample file <ChevronDown />
         </Button>
       </DropdownMenuTrigger>

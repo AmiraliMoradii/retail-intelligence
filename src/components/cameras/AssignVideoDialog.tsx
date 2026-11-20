@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ProcessingStatusBadge } from "@/components/shared/StatusBadge";
+import { PUBLIC_DEMO } from "@/config/demo";
 import { useAppStore } from "@/store/useAppStore";
 import { cameraLabel } from "@/services/analyticsService";
 import type { Camera } from "@/types";
@@ -41,13 +42,17 @@ export function AssignVideoDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Assign video to {cameraLabel(camera)}</DialogTitle>
-          <DialogDescription>Choose the uploaded footage this camera's aisle regions should be analysed from (simulated).</DialogDescription>
+          <DialogDescription>
+            {PUBLIC_DEMO ? "Choose a sample video record for this camera." : "Choose the uploaded footage to associate with this camera."}
+          </DialogDescription>
         </DialogHeader>
         {videos.length === 0 ? (
           <EmptyState
             icon={UploadCloud}
-            title="No uploaded videos"
-            description="Upload an MP4 recording in Data Management, then assign it here."
+            title={PUBLIC_DEMO ? "No sample video records" : "No uploaded videos"}
+            description={PUBLIC_DEMO
+              ? "Reset demo data from the account menu to restore the sample records."
+              : "Upload an MP4 recording in Data Management, then assign it here."}
             action={
               <Button asChild size="sm">
                 <Link to="/data?tab=video" onClick={() => onOpenChange(false)}>

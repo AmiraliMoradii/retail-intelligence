@@ -14,6 +14,7 @@ import { CameraDetailsSheet } from "@/components/cameras/CameraDetailsSheet";
 import { AssignVideoDialog } from "@/components/cameras/AssignVideoDialog";
 import { AisleRegionEditor } from "@/components/cameras/AisleRegionEditor";
 import { ConfirmDialog } from "@/components/cameras/ConfirmDialog";
+import { PUBLIC_DEMO } from "@/config/demo";
 import { useAppStore } from "@/store/useAppStore";
 import { cameraLabel } from "@/services/analyticsService";
 import { cameraStatus } from "@/utils/cameras";
@@ -53,16 +54,18 @@ export default function CameraConfigurationPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow={<DemoBadge label="Simulated camera connections" tooltip="Cameras are registered records. Footage comes from uploaded video files; no CCTV hardware is connected." />}
+        eyebrow={<DemoBadge label="Simulated camera connections" tooltip={PUBLIC_DEMO ? "This demo uses sample camera records." : "Cameras are registered records. Footage comes from uploaded video files; no CCTV hardware is connected."} />}
         title="Cameras & Aisles"
         description="Register camera sources and define the aisle regions their footage is analysed for. Analytics only exist where a camera covers a region."
         actions={
           <>
-            <Button variant="outline" asChild>
-              <Link to="/data?tab=video">
-                <Video /> Manage videos
-              </Link>
-            </Button>
+            {!PUBLIC_DEMO && (
+              <Button variant="outline" asChild>
+                <Link to="/data?tab=video">
+                  <Video /> Manage videos
+                </Link>
+              </Button>
+            )}
             <Button onClick={openAdd}>
               <Plus /> Add camera
             </Button>
@@ -87,7 +90,9 @@ export default function CameraConfigurationPage() {
               <EmptyState
                 icon={CameraIcon}
                 title="No camera configured"
-                description="Add a camera and assign uploaded footage to start producing (simulated) aisle analytics."
+                description={PUBLIC_DEMO
+                  ? "Add a sample camera and assign a sample video record."
+                  : "Add a camera and assign uploaded footage to try simulated aisle analytics."}
                 action={
                   <Button onClick={openAdd}>
                     <Plus /> Add camera

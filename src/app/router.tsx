@@ -1,11 +1,16 @@
 import { lazy } from "react";
-import { createBrowserRouter, Navigate } from "react-router";
+import { createBrowserRouter, createHashRouter, Navigate } from "react-router";
+import { PUBLIC_DEMO } from "@/config/demo";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { RedirectIfAuthed, RequireAuth, RequireOnboarding } from "./guards";
-import LoginPage from "@/pages/LoginPage";
+const LoginPage = import.meta.env.VITE_PUBLIC_DEMO === "1"
+  ? lazy(() => import("@/pages/PublicDemoPage"))
+  : lazy(() => import("@/pages/LoginPage"));
 import NotFoundPage from "@/pages/NotFoundPage";
 
-const OnboardingPage = lazy(() => import("@/pages/OnboardingPage"));
+const OnboardingPage = import.meta.env.VITE_PUBLIC_DEMO === "1"
+  ? () => <Navigate to="/overview" replace />
+  : lazy(() => import("@/pages/OnboardingPage"));
 const DashboardPage = lazy(() => import("@/pages/DashboardPage"));
 const AisleAnalyticsPage = lazy(() => import("@/pages/AisleAnalyticsPage"));
 const InventoryPage = lazy(() => import("@/pages/InventoryPage"));
@@ -14,10 +19,15 @@ const DataManagementPage = lazy(() => import("@/pages/DataManagementPage"));
 const CameraConfigurationPage = lazy(() => import("@/pages/CameraConfigurationPage"));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
 
-const StoreInventoryPage = lazy(() => import("@/pages/StoreInventoryPage"));
+// Keep the store inventory screen out of the public build, even if both flags are set.
+const StoreInventoryPage = import.meta.env.VITE_PUBLIC_DEMO !== "1" && import.meta.env.VITE_STORE_INVENTORY === "1"
+  ? lazy(() => import("@/pages/StoreInventoryPage"))
+  : null;
 
-export const router = createBrowserRouter([
-  ...(import.meta.env.VITE_STORE_INVENTORY === "1"
+const createRouter = PUBLIC_DEMO ? createHashRouter : createBrowserRouter;
+
+export const router = createRouter([
+  ...(StoreInventoryPage
     ? [{ path: "/store-inventory", element: <StoreInventoryPage /> }]
     : []),
   {
@@ -29,7 +39,7 @@ export const router = createBrowserRouter([
     children: [
       { path: "/onboarding", element: <OnboardingPage /> },
       {
-        element: <RequireOnboarding />,
+        element: PUBLIC_DEMO ? undefined : <RequireOnboarding />,
         children: [
           {
             element: <AppLayout />,

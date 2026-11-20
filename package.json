@@ -1,7 +1,7 @@
 {
   "name": "retail-intelligence-prototype",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0-preview.1",
   "description": "CPSC 598 Milestone 2 — interactive high-fidelity UI prototype for an AI-powered retail analytics and inventory optimization platform.",
   "type": "module",
   "scripts": {
@@ -9,6 +9,7 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --noEmit",
     "test": "node --test",
+    "test:e2e": "playwright test",
     "benchmark:forecast": "node scripts/benchmark-forecast.mjs",
     "preview": "vite preview"
   },
@@ -33,6 +34,7 @@
     "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@playwright/test": "1.62.1",
     "@tailwindcss/vite": "^4.1.13",
     "@types/node": "^22.18.0",
     "@types/papaparse": "^5.3.16",

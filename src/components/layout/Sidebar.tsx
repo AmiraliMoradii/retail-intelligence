@@ -1,5 +1,6 @@
 import { NavLink } from "react-router";
 import { ChevronsLeft, ChevronsRight, FlaskConical } from "lucide-react";
+import { PUBLIC_DEMO } from "@/config/demo";
 import { NAV_ITEMS } from "@/config/navigation";
 import { BrandMark } from "./BrandMark";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -10,7 +11,7 @@ import { cn } from "@/lib/utils";
 export function SidebarNav({ collapsed = false, onNavigate }: { collapsed?: boolean; onNavigate?: () => void }) {
   const { needsReplenishment } = useInventorySummary();
   const failedVideos = useAppStore((s) => s.videos.filter((v) => v.status === "failed").length);
-  const counts: Record<string, number> = { "/inventory": needsReplenishment, "/data": failedVideos };
+  const counts: Record<string, number> = { "/inventory": needsReplenishment, "/data": PUBLIC_DEMO ? 0 : failedVideos };
 
   return (
     <nav aria-label="Main navigation" className="flex flex-col gap-0.5">
