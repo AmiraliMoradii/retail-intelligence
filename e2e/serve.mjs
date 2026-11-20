@@ -1,5 +1,5 @@
 import { preview } from "vite";
-import { provisionMembership } from "../backend/auth.mjs";
+import { grantMembership } from "../backend/accounts.mjs";
 import { openDatabase } from "../backend/database.mjs";
 import { createInventoryServer } from "../backend/server.mjs";
 import { demoBase, demoPort, password, storePort, stores } from "./fixtures.mjs";
@@ -16,7 +16,7 @@ if (process.argv[2] === "demo") {
 } else {
   const db = openDatabase(":memory:");
   for (const store of Object.values(stores)) {
-    await provisionMembership(db, { ...store, password, role: "manager" });
+    await grantMembership(db, { ...store, password, role: "manager", actor: "operator:browser-test" });
   }
   const server = createInventoryServer({ db, staticRoot: "dist/store" });
   server.listen(storePort, host);

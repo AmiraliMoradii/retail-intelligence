@@ -70,6 +70,8 @@ The forecast benchmark holds out the last three months for each of 24 synthetic 
 
 ## Before a store pilot
 
+See the [pilot operations runbook](docs/PILOT-OPERATIONS.md) for account administration and backup drills, and the [forecast evaluation guide](docs/FORECAST-EVALUATION.md) for checking monthly demand baselines.
+
 Validate the CSV conventions against a store's exports and agree on how staff handle adjustments, stock dates, and planning periods. Deploy behind HTTPS with `RI_SECURE_COOKIE=1`, put SQLite on backed-up durable storage, test restoration, and establish account recovery, revocation, and audit monitoring. The preview uses local provisioning and has no account administration UI. Start with inventory and review the results with staff before making purchasing decisions from them.
 
 Camera ingestion is a separate milestone. Agree on the purpose and authorized viewers before collecting any footage. Define retention and deletion for raw video and aggregate metrics, encrypt storage and transport, test deletion and access logging, and validate aisle-count accuracy and camera coverage. The demo does not connect to cameras or run computer vision.
