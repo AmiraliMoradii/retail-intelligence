@@ -61,10 +61,11 @@ npm run benchmark:forecast
 VITE_STORE_INVENTORY=1 npm run build -- --outDir dist/store
 VITE_PUBLIC_DEMO=1 npm run build -- --base /retail-intelligence/ --outDir dist/demo
 npx playwright install chromium
+npx playwright install chrome
 npm run test:e2e
 ```
 
-GitHub Actions is configured to run the same checks after a clean install. The automated suite exercises CSV validation, store isolation, viewer permissions, import retries, dated stock, and persistence across a server restart. Chromium tests both builds at desktop and phone widths. See [Contributing](CONTRIBUTING.md) before opening a pull request. For a change to import behavior, include a small synthetic CSV that shows what should happen. For UI changes, include the route and steps for testing with a keyboard and a phone-width viewport.
+GitHub Actions is configured to run the same checks after a clean install. The automated suite exercises CSV validation, store isolation, viewer permissions, import retries, dated stock, and persistence across a server restart. Chromium tests both builds at desktop and phone widths. Chrome plays the synthetic shelf MP4 in the desktop camera test. Try the [synthetic store scenarios](sample-data/stores/README.md) to check inventory and reorder behavior. See [Contributing](CONTRIBUTING.md) before opening a pull request. For a change to import behavior, include a small synthetic CSV that shows what should happen. For UI changes, include the route and steps for testing with a keyboard and a phone-width viewport.
 
 The forecast benchmark holds out the last three months for each of 24 synthetic products. Predicting the last observed month scores 27.40 units MAE and 12.38% WAPE. The two versions of the demo heuristic score 24.74 and 25.74 units MAE, and 11.18% and 11.63% WAPE. Real-store performance and model-specific accuracy still require testing on representative data.
 

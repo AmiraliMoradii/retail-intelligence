@@ -1,5 +1,5 @@
 import { strict as assert } from "node:assert";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -184,4 +184,65 @@ test("authenticated inventory persists across server restarts and is isolated by
     assert.equal((await server.request("/api/session", { method: "DELETE", cookie: northCookie })).status, 204);
     assert.equal((await server.request(north + "/inventory", { cookie: northCookie })).status, 401);
   });
+});
+
+test("three synthetic stores reconcile inventory independently", async (t) => {
+  const db = openDatabase(":memory:");
+  const server = await runServer(db);
+  t.after(async () => {
+    await server.close();
+    db.close();
+  });
+  const scenarios = [
+    { id: "cedar-grocery", name: "Cedar Grocery", stock: 9, octoberSales: 160, order: 40 },
+    { id: "harbour-market", name: "Harbour Market", stock: 90, octoberSales: 19, order: 0 },
+    { id: "maple-produce", name: "Maple Produce", stock: 22, octoberSales: 69, order: 27 },
+  ];
+  const fixture = (name) => readFile(new URL(`../sample-data/stores/${name}.csv`, import.meta.url), "utf8");
+
+  for (const store of scenarios) {
+    const email = `manager@${store.id}.example`;
+    await grantMembership(db, { actor: "test:synthetic", email, password, storeId: store.id, storeName: store.name });
+    const { cookie } = await login(server, email);
+    store.cookie = cookie;
+    store.path = `/api/stores/${store.id}`;
+    const csv = await fixture(store.id);
+    const response = await upload(server, store.path, cookie, csv, `${store.id}.csv`);
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).rowCount, 8);
+  }
+
+  for (const store of scenarios) {
+    const { products, imports } = await get(server, store.path, store.cookie);
+    assert.equal(products.length, 2);
+    assert.equal(imports.length, 1);
+    const bread = products.find(({ id }) => id === "SHARED-01");
+    assert.equal(bread.currentStock, store.stock);
+    assert.equal(bread.history.at(-1).soldQuantity, store.octoberSales);
+    const result = await post(server, store.path + "/reorder", store.cookie, {
+      productId: bread.id, forecastDemand: 50, safetyStock: 4, incomingStock: 5,
+    });
+    assert.equal(result.status, 200);
+    assert.equal((await result.json()).recommendedOrder, store.order);
+    for (const other of scenarios.filter(({ id }) => id !== store.id)) {
+      assert.equal((await server.request(other.path + "/inventory", { cookie: store.cookie })).status, 404);
+      assert.equal((await upload(server, other.path, store.cookie, await fixture(store.id))).status, 404);
+    }
+  }
+
+  const [cedar, , maple] = scenarios;
+  assert.equal((await upload(server, cedar.path, cedar.cookie, await fixture("cedar-grocery-correction"))).status, 200);
+  assert.equal((await upload(server, cedar.path, cedar.cookie, await fixture("cedar-grocery-conflict"))).status, 422);
+  const corrected = await get(server, cedar.path, cedar.cookie);
+  const bread = corrected.products.find(({ id }) => id === "SHARED-01");
+  assert.equal(corrected.imports.length, 2);
+  assert.equal(bread.currentStock, 9);
+  assert.equal(bread.history.find(({ month }) => month === "2026-09").soldQuantity, 145);
+
+  const apples = (await get(server, maple.path, maple.cookie)).products.find(({ id }) => id === "MAP-02");
+  assert.equal(apples.stockKnown, false);
+  assert.equal(apples.history.find(({ month }) => month === "2026-09").soldQuantity, 0);
+  assert.equal((await post(server, maple.path + "/reorder", maple.cookie, {
+    productId: apples.id, forecastDemand: 50, safetyStock: 4, incomingStock: 5,
+  })).status, 422);
 });
