@@ -207,7 +207,7 @@ function StoreInventory({ store }: { store: Store }) {
         <form className="space-y-3 rounded border p-4" onSubmit={importCsv}>
           <h2 className="text-xl font-semibold">Import inventory</h2>
           <p>Upload a CSV up to {MAX_CSV_BYTES / 1024 / 1024} MiB. Each product and month in the file replaces the saved totals for that month. Include a dated stock count to calculate reorder quantities.</p>
-          <label className="block">Inventory CSV<input className={field} type="file" name="csv" accept=".csv" required /></label>
+          <label className="block">Inventory CSV<input className={field} type="file" name="csv" accept=".csv" disabled={busy} required /></label>
           <button className={action} disabled={busy || !inventory}>Import CSV</button>
         </form>
       )}
@@ -236,16 +236,19 @@ function StoreInventory({ store }: { store: Store }) {
         <form className="space-y-3 rounded border p-4" onSubmit={reorder} onChange={() => setRecommendation(undefined)}>
           <h2 className="text-xl font-semibold">Reorder calculator</h2>
           <p>Use the same planning period for demand and incoming stock. The calculation uses the store’s latest imported stock.</p>
-          <label className="block">Product
-            <select name="product" className={field}>
-              {stockProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
-            </select>
-          </label>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <label>Expected demand<input className={field} type="number" name="forecastDemand" min="0" required /></label>
-            <label>Safety stock<input className={field} type="number" name="safetyStock" min="0" defaultValue="0" required /></label>
-            <label>Incoming stock<input className={field} type="number" name="incomingStock" min="0" defaultValue="0" required /></label>
-          </div>
+          <fieldset className="space-y-3 disabled:opacity-60" disabled={busy}>
+            <legend className="sr-only">Reorder inputs</legend>
+            <label className="block">Product
+              <select name="product" className={field}>
+                {stockProducts.map((product) => <option key={product.id} value={product.id}>{product.name} ({product.id})</option>)}
+              </select>
+            </label>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <label>Expected demand<input className={field} type="number" name="forecastDemand" min="0" required /></label>
+              <label>Safety stock<input className={field} type="number" name="safetyStock" min="0" defaultValue="0" required /></label>
+              <label>Incoming stock<input className={field} type="number" name="incomingStock" min="0" defaultValue="0" required /></label>
+            </div>
+          </fieldset>
           <button className={action} disabled={busy}>Calculate reorder</button>
           <output className="block">
             {recommendation && (

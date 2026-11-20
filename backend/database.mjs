@@ -176,7 +176,7 @@ export function readInventory(db, storeId) {
 export function groupInventoryRows(records) {
   const groups = new Map();
   for (const row of records) {
-    const group = groups.get(row.product_id) ?? { months: new Map() };
+    const group = groups.get(row.product_id) ?? { months: new Map(), stockByDate: new Map() };
     const month = row.date.slice(0, 7);
     const date = row.date.length === 7 ? `${row.date}-01` : row.date;
     const sales = group.months.get(month) ?? { sold: 0, ordered: 0 };
@@ -187,8 +187,13 @@ export function groupInventoryRows(records) {
     }
     group.months.set(month, sales);
     if (!group.latest || date >= group.latest.date) group.latest = { ...row, date };
-    if (row.current_stock !== undefined && (!group.stock || date >= group.stock.date)) {
-      group.stock = { date, quantity: row.current_stock };
+    if (row.current_stock !== undefined) {
+      const previous = group.stockByDate.get(date);
+      if (previous !== undefined && previous !== row.current_stock) {
+        return { error: `Conflicting stock counts for ${row.product_id} on ${date}. Use one count for that date.` };
+      }
+      group.stockByDate.set(date, row.current_stock);
+      if (!group.stock || date >= group.stock.date) group.stock = { date, quantity: row.current_stock };
     }
     groups.set(row.product_id, group);
   }

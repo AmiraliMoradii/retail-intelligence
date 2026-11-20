@@ -4,6 +4,18 @@ Use Node.js 24 and an inventory build from the same release as the backend. Keep
 
 Set the same absolute `RI_DB_PATH` for the server and operator commands. Give the service account write access to its database directory. A private directory is important because SQLite may create additional files alongside the database. Keep this directory outside the application's static file tree.
 
+## Run with software that needs no subscription
+
+The MIT-licensed application uses Node.js and SQLite. The inventory workflow runs on a store-owned computer and requires no paid account, API key, AI provider, or hosted database. A store can use an existing machine and its own backup storage. Hardware, a domain name, and hosting are separate costs if the store chooses to buy them.
+
+Create the store build with `VITE_STORE_INVENTORY=1 npm run build`. Use a private application data directory outside `dist/`, and run the built app and database with one dedicated service account.
+
+- For a single-user evaluation on the host, retain the default loopback address and open `http://127.0.0.1:8787/store-inventory`.
+- For use across a store network, configure a trusted HTTPS certificate. Set `RI_TLS_CERT` to the PEM certificate chain and `RI_TLS_KEY` to its matching private key, set `RI_HOST` to the private interface address, and run `node backend/server.mjs`. The built-in HTTPS listener marks authentication cookies Secure and limits repeated sign-in failures by account and peer address. Use the certificate's hostname and the configured `PORT` in the browser.
+- For a reverse proxy, keep Node on loopback, set `RI_SECURE_COOKIE=1`, and configure HTTPS, client IP rate limits, and request limits at the proxy. Run only one application instance per database. Probe `GET /healthz` from the same network path as staff.
+
+The included HTTPS test generates a temporary certificate and trusts it only inside its test client. It requires OpenSSL and verifies an import, Secure cookies, backup, restored access, and a 110-unit reorder. Store devices need a certificate they already trust or a private CA installed by the store administrator.
+
 ## Accounts and store access
 
 Grant a manager first for each store. A viewer can read inventory and calculate reorder recommendations. A manager can also import inventory. Use `list-memberships` to confirm the active managers for each store. The commands record successful changes under the operating system account that ran them.
