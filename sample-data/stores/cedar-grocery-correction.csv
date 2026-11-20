@@ -1,0 +1,2 @@
+product_id,product_name,date,ordered_quantity,sold_quantity,current_stock,category
+SHARED-01,Whole Wheat Bread,2026-09-01,150,145,99,Bakery

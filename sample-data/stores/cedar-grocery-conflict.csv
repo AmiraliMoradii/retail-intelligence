@@ -1,0 +1,3 @@
+product_id,product_name,date,ordered_quantity,sold_quantity,current_stock,category
+SHARED-01,Whole Wheat Bread,2026-10-01,165,160,4,Bakery
+SHARED-01,Whole Wheat Bread,2026-10-01,0,0,7,Bakery

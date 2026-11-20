@@ -18,6 +18,7 @@ export default defineConfig({
     { name: "demo-desktop", testMatch: "demo.spec.ts", use: { ...desktop, baseURL: demoURL } },
     { name: "demo-mobile", testMatch: "demo.spec.ts", use: { ...mobile, baseURL: demoURL } },
     { name: "store-desktop", testMatch: "store.spec.ts", use: { ...desktop, baseURL: storeURL } },
+    { name: "camera-desktop", testMatch: "camera.spec.ts", use: { ...desktop, baseURL: storeURL, channel: "chrome" } },
     { name: "store-mobile", testMatch: "store.spec.ts", use: { ...mobile, baseURL: storeURL } },
   ],
   webServer: [

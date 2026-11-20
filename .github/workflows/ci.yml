@@ -39,7 +39,8 @@ jobs:
         env:
           VITE_PUBLIC_DEMO: "1"
       - run: npx playwright install --with-deps chromium
-      - name: Test both builds in desktop and mobile Chromium
+      - run: npx playwright install chrome
+      - name: Test desktop, mobile, and synthetic video playback
         id: browser-tests
         run: npm run test:e2e
       - name: Save browser failure diagnostics

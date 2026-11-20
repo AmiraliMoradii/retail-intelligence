@@ -1,0 +1,9 @@
+product_id,product_name,date,ordered_quantity,sold_quantity,current_stock,category
+SHARED-01,Whole Wheat Bread,2026-07-01,63,58,,Bakery
+SHARED-01,Whole Wheat Bread,2026-08-01,65,60,,Bakery
+SHARED-01,Whole Wheat Bread,2026-09-01,69,64,,Bakery
+SHARED-01,Whole Wheat Bread,2026-10-01,74,69,22,Bakery
+MAP-02,Apples,2026-07-01,185,180,,Produce
+MAP-02,Apples,2026-08-01,227,222,,Produce
+MAP-02,Apples,2026-09-01,5,0,,Produce
+MAP-02,Apples,2026-10-01,260,255,,Produce

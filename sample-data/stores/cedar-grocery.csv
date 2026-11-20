@@ -1,0 +1,9 @@
+product_id,product_name,date,ordered_quantity,sold_quantity,current_stock,category
+SHARED-01,Whole Wheat Bread,2026-07-01,117,112,,Bakery
+SHARED-01,Whole Wheat Bread,2026-08-01,136,131,,Bakery
+SHARED-01,Whole Wheat Bread,2026-09-01,153,148,,Bakery
+SHARED-01,Whole Wheat Bread,2026-10-01,165,160,9,Bakery
+CED-02,Oat Milk,2026-07-01,59,54,,Dairy
+CED-02,Oat Milk,2026-08-01,53,48,,Dairy
+CED-02,Oat Milk,2026-09-01,68,63,,Dairy
+CED-02,Oat Milk,2026-10-01,65,60,38,Dairy

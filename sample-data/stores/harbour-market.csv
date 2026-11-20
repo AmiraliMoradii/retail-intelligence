@@ -1,0 +1,9 @@
+product_id,product_name,date,ordered_quantity,sold_quantity,current_stock,category
+SHARED-01,Whole Wheat Bread,2026-07-01,25,20,,Bakery
+SHARED-01,Whole Wheat Bread,2026-08-01,26,21,,Bakery
+SHARED-01,Whole Wheat Bread,2026-09-01,22,17,,Bakery
+SHARED-01,Whole Wheat Bread,2026-10-01,24,19,90,Bakery
+HAR-02,Shelf Pasta,2026-07-01,113,108,,Pantry
+HAR-02,Shelf Pasta,2026-08-01,91,86,,Pantry
+HAR-02,Shelf Pasta,2026-09-01,103,98,,Pantry
+HAR-02,Shelf Pasta,2026-10-01,125,120,2,Pantry
