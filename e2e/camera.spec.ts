@@ -40,8 +40,12 @@ test("synthetic shelf footage previews and follows the simulated camera workflow
         ctx.drawImage(element, 0, 0);
         return ctx.getImageData(270, 89, 1, 1).data[1];
       });
+      await video.evaluate((element: HTMLVideoElement) => new Promise<void>((resolve) => {
+        element.addEventListener("seeked", () => resolve(), { once: true });
+        element.currentTime = 0.25;
+      }));
+      await expect.poll(green).toBeGreaterThan(100);
       const before = await green();
-      expect(before).toBeGreaterThan(100);
       await video.evaluate((element: HTMLVideoElement) => element.play());
       await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime)).toBeGreaterThan(1.2);
       await expect.poll(green).toBeLessThan(before - 50);
@@ -85,4 +89,44 @@ test("the public camera page plays the bundled shelf clip", async ({ page }) => 
   await clip.evaluate((video: HTMLVideoElement) => video.play());
   await expect.poll(() => clip.evaluate((video: HTMLVideoElement) => video.currentTime)).toBeGreaterThan(1);
   await expect(page.getByRole("link", { name: "Download the sample MP4" })).toBeVisible();
+  await page.getByRole("button", { name: "Check start of sample" }).click();
+  await expect(page.getByText("Looks stocked", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Check end of sample" }).click();
+  await expect(page.getByText("Check shelf: likely empty", { exact: true })).toBeVisible();
+});
+
+test("self-hosted camera calibrates a local clip without transferring it", async ({ page }) => {
+  const writes: string[] = [];
+  page.on("request", (request) => {
+    if (["POST", "PUT", "PATCH"].includes(request.method())) writes.push(request.url());
+  });
+  await page.goto("/login");
+  await page.getByRole("button", { name: "Use demo account" }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("button", { name: "Skip setup" }).click();
+  await page.waitForURL("**/overview");
+  await page.goto("/cameras");
+  await page.getByLabel("Local fixed-camera MP4").setInputFiles({
+    name: "private-synthetic-test.mp4", mimeType: "video/mp4", buffer: shelfClip,
+  });
+  const video = page.getByLabel("Local shelf video");
+  const stocked = page.getByRole("button", { name: "Save stocked frame" });
+  await expect(stocked).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Check selected moment" })).toBeDisabled();
+  await video.evaluate((element: HTMLVideoElement) => new Promise<void>((resolve) => {
+    element.addEventListener("seeked", () => resolve(), { once: true });
+    element.currentTime = 0.25;
+  }));
+  await stocked.click();
+  await video.evaluate((element: HTMLVideoElement) => new Promise<void>((resolve) => {
+    element.addEventListener("seeked", () => resolve(), { once: true });
+    element.currentTime = 1.8;
+  }));
+  await page.getByRole("button", { name: "Save empty frame" }).click();
+  await page.getByRole("button", { name: "Check selected moment" }).click();
+  await expect(page.getByText("Check shelf: likely empty", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Use sample video" }).click();
+  await expect(video).toHaveCount(0);
+  await expect(page.getByText("Check shelf: likely empty", { exact: true })).toHaveCount(0);
+  expect(writes).toEqual([]);
 });
