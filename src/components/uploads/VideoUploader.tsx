@@ -15,6 +15,7 @@ import { cameraLabel } from "@/services/analyticsService";
 import { formatBytes } from "@/utils/formatters";
 import { uid } from "@/utils/random";
 import { cn } from "@/lib/utils";
+import sampleVideoUrl from "@/assets/synthetic-shelf.mp4?url";
 
 export const MAX_VIDEO_BYTES = 2 * 1024 * 1024 * 1024;
 
@@ -40,6 +41,7 @@ export function VideoUploader({ onAdded }: { onAdded?: (videoId: string) => void
   const assignVideoToCamera = useAppStore((s) => s.assignVideoToCamera);
 
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const [loadingSample, setLoadingSample] = React.useState(false);
   const [phase, setPhase] = React.useState<Phase>("idle");
   const [dragOver, setDragOver] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -101,6 +103,21 @@ export function VideoUploader({ onAdded }: { onAdded?: (videoId: string) => void
     setPhase("details");
   };
 
+  const loadSample = async () => {
+    setLoadingSample(true);
+    setError(null);
+    try {
+      const response = await fetch(sampleVideoUrl);
+      if (!response.ok) throw new Error("Sample video unavailable");
+      await handleFile(new File([await response.blob()], "synthetic-shelf.mp4", { type: "video/mp4" }));
+    } catch {
+      setError("Could not load the sample video. Try again.");
+      setPhase("error");
+    } finally {
+      setLoadingSample(false);
+    }
+  };
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!file || !pending) return;
@@ -151,7 +168,7 @@ export function VideoUploader({ onAdded }: { onAdded?: (videoId: string) => void
             e.preventDefault();
             setDragOver(false);
             const f = e.dataTransfer.files?.[0];
-            if (f) void handleFile(f);
+            if (f && phase === "idle" && !loadingSample) void handleFile(f);
           }}
           className={cn(
             "flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors",
@@ -172,9 +189,14 @@ export function VideoUploader({ onAdded }: { onAdded?: (videoId: string) => void
               </div>
               <p className="text-sm font-semibold">Drag and drop recorded CCTV footage</p>
               <p className="mt-1 text-xs text-muted-foreground">MP4 only · up to 2 GB · preview before adding</p>
-              <Button type="button" className="mt-4" onClick={() => inputRef.current?.click()}>
-                <Film /> Choose video
-              </Button>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                <Button type="button" disabled={loadingSample} onClick={() => inputRef.current?.click()}>
+                  <Film /> Choose video
+                </Button>
+                <Button type="button" variant="outline" disabled={loadingSample} onClick={() => void loadSample()}>
+                  {loadingSample ? "Loading sample…" : "Use synthetic shelf video"}
+                </Button>
+              </div>
               <input
                 ref={inputRef}
                 type="file"
@@ -184,7 +206,7 @@ export function VideoUploader({ onAdded }: { onAdded?: (videoId: string) => void
                 aria-label="Video file"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f) void handleFile(f);
+                  if (f && phase === "idle" && !loadingSample) void handleFile(f);
                 }}
               />
             </>
@@ -229,9 +251,11 @@ export function VideoUploader({ onAdded }: { onAdded?: (videoId: string) => void
               muted
               preload="metadata"
               className="aspect-video w-full rounded-lg bg-slate-950 object-contain"
+              onError={() => setError("This browser could not play the video. Try a recent browser or a different MP4 file.")}
               onLoadedMetadata={(e) => setDuration(durationLabel(e.currentTarget.duration))}
               aria-label={`Preview of ${file.name}`}
             />
+            {error && <p role="alert" className="text-sm text-destructive-text">{error}</p>}
             <p className="truncate text-xs text-muted-foreground">
               {file.name} · {formatBytes(file.size)} · {duration}
             </p>

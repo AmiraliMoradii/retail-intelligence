@@ -1,3 +1,4 @@
+import sampleVideoUrl from "@/assets/synthetic-shelf.mp4?url";
 import { useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
@@ -72,6 +73,29 @@ export default function CameraConfigurationPage() {
           </>
         }
       />
+
+      {PUBLIC_DEMO && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Synthetic shelf video</CardTitle>
+            <CardDescription>Three packages disappear halfway through this clip. Play it to see the change.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <video
+              className="w-full max-w-lg rounded-lg bg-slate-950"
+              src={sampleVideoUrl}
+              aria-label="Synthetic shelf video"
+              controls
+              muted
+              playsInline
+              preload="metadata"
+            />
+            <a className="mt-3 inline-block underline" href={sampleVideoUrl} download="synthetic-shelf.mp4">
+              Download the sample MP4
+            </a>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

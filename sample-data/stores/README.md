@@ -14,6 +14,6 @@ After importing Cedar Grocery, import the [September correction](cedar-grocery-c
 
 ## Try the simulated camera workflow
 
-Run the self-hosted build and open its local sample-data demo. In **Data Management** → **Video Data**, use this [two-second synthetic shelf MP4](../../e2e/fixtures/synthetic-shelf.mp4). It consists of drawn shelves and colored product blocks. Three blocks disappear halfway through. It contains no real footage and is kept with the test fixtures.
+Run the self-hosted build and open its local sample-data demo. In **Data Management** → **Video Data**, select **Use synthetic shelf video**. The public demo also plays the [two-second MP4](../../src/assets/synthetic-shelf.mp4) in **Cameras & Aisles**. It consists of drawn shelves and colored product blocks. Three blocks disappear halfway through. It contains no real footage and ships with both builds.
 
 The browser test checks that Chrome decodes the MP4, the app assigns it to a sample camera, and the simulated job finishes. A copy of the same file under a name containing `corrupt` exercises the simulated failure. The test also unassigns the Snacks region and verifies its heatmap shows no coverage, and checks that the original clip is unavailable after navigation reloads the app. Video bytes stay in the browser for that page session. Shelf counts and the missing blocks in the clip are not detected by the app. Its heatmap uses bundled synthetic aisle data.
