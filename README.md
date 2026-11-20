@@ -25,9 +25,9 @@ Open the URL printed by Vite. Select **Use demo account**, sign in, and finish o
 
 The demo saves changes in your browser. Use bundled samples or synthetic records. Demo sign-in, aisle analytics, camera processing, and demand forecasts are simulated. [Demo walkthrough](docs/DEMO_SCRIPT.md)
 
-## Try the self-hosted inventory workflow
+## Run the free self-hosted inventory app
 
-Build the app with the store inventory page enabled. Run these commands from the repository root. Use a password manager to generate a distinct password of at least 12 characters. The Bash example reads it without echoing it or adding it to shell history.
+The MIT-licensed inventory app requires no paid plan, API key, or cloud database. Run it on a store-owned computer. For shared access over HTTPS and backup instructions, see the [operations runbook](docs/PILOT-OPERATIONS.md). Build the app with the store inventory page enabled. Run these commands from the repository root. Use a password manager to generate a distinct password of at least 12 characters. The Bash example reads it without echoing it or adding it to shell history.
 
 ```bash
 npm ci
@@ -48,7 +48,7 @@ Store data and sessions are stored in SQLite at `.ri-data/inventory.sqlite` by d
 
 - Required columns are `product_id`, `product_name`, `date`, `ordered_quantity`, and `sold_quantity`. Optional columns are `category`, `current_stock`, `supplier_lead_time`, and `unit_cost`. Use `YYYY-MM-DD` for dated stock counts. A month-only value is treated as the first day of that month.
 - Each file supplies complete totals for the product-months it includes. Multiple rows for the same product-month are summed. A later upload replaces the affected monthly totals and preserves omitted months.
-- A stock count is applied only if its date is at least as recent as the saved count. Missing stock stays unknown until a count is imported. Repeating an identical file returns the original import receipt, including when the file is renamed.
+- A stock count is applied only if its date is at least as recent as the saved count. Missing stock stays unknown until a count is imported. Conflicting counts for the same SKU and date in one file are rejected. Repeating identical contents returns the original receipt, including when the file is renamed. To deliberately reinstate earlier totals, put the affected product-months in a new correction export with different contents.
 - Each upload is limited to 5 MiB and 25,000 rows in store mode. Rejected files leave the stored inventory unchanged.
 - The reorder rule is `max(0, expected demand + safety stock − on-hand stock − incoming stock)`. Use the same planning period for demand and incoming stock. The calculator gives advice and does not submit an order.
 

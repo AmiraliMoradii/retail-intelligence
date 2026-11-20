@@ -1,7 +1,7 @@
 {
   "name": "retail-intelligence-prototype",
   "private": true,
-  "version": "0.3.0-preview.1",
+  "version": "0.3.0-preview.2",
   "description": "CPSC 598 Milestone 2 — interactive high-fidelity UI prototype for an AI-powered retail analytics and inventory optimization platform.",
   "type": "module",
   "scripts": {

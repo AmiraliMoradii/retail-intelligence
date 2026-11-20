@@ -1,6 +1,7 @@
-import { createReadStream } from "node:fs";
-import { stat } from "node:fs/promises";
+import { createReadStream, readFileSync, realpathSync } from "node:fs";
+import { realpath, stat } from "node:fs/promises";
 import { createServer } from "node:http";
+import { createServer as createHttpsServer } from "node:https";
 import { extname, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
@@ -65,24 +66,29 @@ function readJson(request, limit) {
   });
 }
 
-function rateLimitLogin() {
+function loginFailures(limit) {
   const entries = new Map();
   const windowMs = 10 * 60 * 1000;
-  return (key, limit) => {
-    const now = Date.now();
-    const existing = entries.get(key);
-    if (existing && existing.until > now) {
-      if (existing.count >= limit) throw new RequestError(429, "Too many sign-in attempts. Try again in a few minutes.");
-      existing.count++;
-      return;
-    }
-    if (entries.size >= 1000) {
-      for (const [entryKey, entry] of entries) {
-        if (entry.until <= now) entries.delete(entryKey);
+  return {
+    check(key) {
+      const entry = entries.get(key);
+      if (entry?.until <= Date.now()) entries.delete(key);
+      else if (entry?.count >= limit) {
+        throw new RequestError(429, "Too many sign-in attempts. Try again in a few minutes.");
       }
-      if (entries.size >= 1000) throw new RequestError(429, "Too many sign-in attempts. Try again in a few minutes.");
-    }
-    entries.set(key, { count: 1, until: now + windowMs });
+    },
+    fail(key) {
+      const entry = entries.get(key);
+      if (entry) {
+        entry.count++;
+        return;
+      }
+      if (entries.size >= 1000) entries.delete(entries.keys().next().value);
+      entries.set(key, { count: 1, until: Date.now() + windowMs });
+    },
+    clear(key) {
+      entries.delete(key);
+    },
   };
 }
 
@@ -143,15 +149,20 @@ async function serveStatic(request, response, root, pathname) {
   if (decoded.split("/").some((part) => part.startsWith(".")) || decoded.includes("\\") || decoded.includes("\0")) {
     return reply(response, 404, { error: "Page not found." });
   }
+  if (extname(decoded) && !/^\/(?:index\.html|favicon\.svg|[A-Z-]+\.txt|(?:assets|samples)\/[^/]+)$/.test(decoded)) {
+    return reply(response, 404, { error: "Page not found." });
+  }
   const filename = extname(decoded) ? resolve(root, `.${decoded}`) : resolve(root, "index.html");
   if (!filename.startsWith(`${root}${sep}`)) return reply(response, 404, { error: "Page not found." });
-  const file = await stat(filename).catch((error) => {
+  const type = staticTypes[extname(filename)];
+  if (!type) return reply(response, 404, { error: "Page not found." });
+  const file = await realpath(filename).then((resolved) => resolved === filename ? stat(resolved) : null).catch((error) => {
     if (error.code === "ENOENT" || error.code === "ENOTDIR") return null;
     throw error;
   });
   if (!file?.isFile()) return reply(response, 404, { error: "Page not found." });
   response.writeHead(200, {
-    "Content-Type": staticTypes[extname(filename)] ?? "application/octet-stream",
+    "Content-Type": type,
     "Content-Length": file.size,
     "Cache-Control": "no-cache",
   });
@@ -159,20 +170,27 @@ async function serveStatic(request, response, root, pathname) {
   else createReadStream(filename).on("error", (error) => response.destroy(error)).pipe(response);
 }
 
-export function createInventoryServer({ db, secureCookie = false, staticRoot } = {}) {
+export function createInventoryServer({ db, secureCookie = false, staticRoot, tls } = {}) {
   const ownsDatabase = !db;
+  const root = staticRoot ? realpathSync(staticRoot) : null;
   db ??= openDatabase();
-  const root = staticRoot ? resolve(staticRoot) : null;
-  const limitLogin = rateLimitLogin();
+  const failures = loginFailures(12);
+  const peerFailures = tls ? loginFailures(40) : null;
   let activeSignIns = 0;
+  let activeImports = 0;
+  secureCookie ||= Boolean(tls);
 
-  const server = createServer({ requestTimeout: 30_000, headersTimeout: 15_000 }, async (request, response) => {
+  const handleRequest = async (request, response) => {
     response.setHeader("X-Content-Type-Options", "nosniff");
     response.setHeader("X-Frame-Options", "DENY");
     response.setHeader("Referrer-Policy", "same-origin");
     try {
       const { pathname } = new URL(request.url, "http://localhost");
       const { method } = request;
+      if (pathname === "/healthz" && method === "GET") {
+        db.prepare("SELECT 1").get();
+        return reply(response, 200, { status: "ok" });
+      }
       if (!pathname.startsWith("/api/")) return await serveStatic(request, response, root, pathname);
       if (request.headers["sec-fetch-site"] === "cross-site") throw new RequestError(403, "Cross-site API requests are disabled.");
 
@@ -182,14 +200,20 @@ export function createInventoryServer({ db, secureCookie = false, staticRoot } =
         if (!validEmail(email) || typeof password !== "string" || password.length > 128) {
           throw new RequestError(401, "Invalid email or password.");
         }
-        limitLogin(`ip:${request.socket.remoteAddress}`, 40);
-        limitLogin(`email:${email}`, 12);
+        const peer = request.socket.remoteAddress;
+        failures.check(email);
+        peerFailures?.check(peer);
         if (activeSignIns >= 2) throw new RequestError(429, "Sign-in is busy. Try again shortly.");
         activeSignIns++;
         try {
           const credentials = await checkCredentials(db, email, password);
           const sessionCookie = credentials && createSession(db, request, credentials, secureCookie);
-          if (!sessionCookie) throw new RequestError(401, "Invalid email or password.");
+          if (!sessionCookie) {
+            failures.fail(email);
+            peerFailures?.fail(peer);
+            throw new RequestError(401, "Invalid email or password.");
+          }
+          failures.clear(email);
           return reply(response, 200, sessionBody(db, credentials.user), { "Set-Cookie": sessionCookie });
         } finally {
           activeSignIns--;
@@ -225,7 +249,13 @@ export function createInventoryServer({ db, secureCookie = false, staticRoot } =
       }
       if (resource === "imports" && method === "POST") {
         authorize(true);
-        return reply(response, 200, await importInventory(request, db, storeId, () => authorize(true)));
+        if (activeImports >= 2) throw new RequestError(429, "Inventory imports are busy. Try again shortly.");
+        activeImports++;
+        try {
+          return reply(response, 200, await importInventory(request, db, storeId, () => authorize(true)));
+        } finally {
+          activeImports--;
+        }
       }
       if (resource === "reorder" && method === "POST") {
         authorize();
@@ -239,7 +269,12 @@ export function createInventoryServer({ db, secureCookie = false, staticRoot } =
       if (!response.headersSent) return reply(response, 500, { error: "The server could not complete the request." });
       response.destroy();
     }
-  });
+  };
+  const timeouts = { requestTimeout: 30_000, headersTimeout: 15_000 };
+  const server = tls
+    ? createHttpsServer({ ...tls, ...timeouts, minVersion: "TLSv1.2" }, handleRequest)
+    : createServer(timeouts, handleRequest);
+  server.setTimeout(15_000);
   if (ownsDatabase) server.on("close", () => db.close());
   return server;
 }
@@ -248,9 +283,13 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.m
   process.umask(0o077);
   const port = Number(process.env.PORT ?? 8787);
   const host = process.env.RI_HOST ?? "127.0.0.1";
+  const { RI_TLS_CERT: certPath, RI_TLS_KEY: keyPath } = process.env;
+  if (Boolean(certPath) !== Boolean(keyPath)) throw new Error("Set both RI_TLS_CERT and RI_TLS_KEY for direct HTTPS.");
+  const tls = certPath ? { cert: readFileSync(certPath), key: readFileSync(keyPath) } : undefined;
   const server = createInventoryServer({
+    tls,
     secureCookie: process.env.RI_SECURE_COOKIE === "1",
     staticRoot: process.env.RI_STATIC_ROOT ?? "dist",
   });
-  server.listen(port, host, () => console.log(`Retail Intelligence listening on http://${host}:${server.address().port}`));
+  server.listen(port, host, () => console.log(`Retail Intelligence listening on ${tls ? "https" : "http"}://${host}:${server.address().port}`));
 }

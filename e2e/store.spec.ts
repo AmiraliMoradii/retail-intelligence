@@ -32,8 +32,22 @@ test("manager imports dated inventory and calculates a reorder", async ({ page }
   await page.getByLabel("Expected demand").fill("250");
   await page.getByLabel("Safety stock").fill("30");
   await page.getByLabel("Incoming stock").fill("20");
-  await page.getByRole("button", { name: "Calculate reorder" }).click();
+  let completeReorder!: () => void;
+  const allowReorder = new Promise<void>((resolve) => { completeReorder = resolve; });
+  await page.route("**/reorder", async (route) => {
+    await allowReorder;
+    await route.continue();
+  }, { times: 1 });
+  try {
+    await page.getByRole("button", { name: "Calculate reorder" }).click();
+    await expect(page.getByLabel("Expected demand")).toBeDisabled();
+    await expect(page.getByRole("combobox", { name: "Product", exact: true })).toBeDisabled();
+  } finally {
+    completeReorder();
+  }
   await expect(page.getByText("Recommended order: 110 units")).toBeVisible();
+  await page.getByLabel("Expected demand").fill("260");
+  await expect(page.getByText("Recommended order: 110 units")).toHaveCount(0);
 
   await page.reload();
   await expect(bread).toBeVisible();
