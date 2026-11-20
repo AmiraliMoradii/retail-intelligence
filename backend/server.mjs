@@ -98,7 +98,7 @@ function invalidBusinessRow(row) {
     || (row.unit_cost !== undefined && !(Number.isFinite(row.unit_cost) && row.unit_cost >= 0 && row.unit_cost <= MAX_WHOLE_QUANTITY));
 }
 
-async function importInventory(request, db, storeId, userId) {
+async function importInventory(request, db, storeId, authorize) {
   const { fileName, csv } = await readJson(request, MAX_CSV_BYTES * 6 + 16384);
   if (typeof fileName !== "string" || fileName.length > 255 || /[\u0000-\u001f\u007f/\\]/.test(fileName) || typeof csv !== "string") {
     throw new RequestError(400, "Provide a CSV filename and the file contents.");
@@ -116,14 +116,15 @@ async function importInventory(request, db, storeId, userId) {
   }
   const { groups, error } = groupInventoryRows(parsed.records);
   if (error) throw new RequestError(422, error);
-  return saveImport(db, { storeId, userId, fileName, csv, rowCount: parsed.records.length, groups });
+  return saveImport(db, { storeId, authorize, fileName, csv, rowCount: parsed.records.length, groups });
 }
 
-async function reorder(request, db, storeId) {
+async function reorder(request, db, storeId, authorize) {
   const { productId, forecastDemand, safetyStock, incomingStock } = await readJson(request, 4096);
   if (typeof productId !== "string" || ![forecastDemand, safetyStock, incomingStock].every(isWholeQuantity)) {
     throw new RequestError(422, `Provide a product and whole quantities from 0 to ${MAX_WHOLE_QUANTITY}.`);
   }
+  authorize();
   const item = db.prepare("SELECT current_stock, stock_date FROM products WHERE store_id = ? AND id = ?").get(storeId, productId);
   if (!item) throw new RequestError(404, "The product was not found.");
   if (item.current_stock === null) throw new RequestError(422, "Import an on-hand stock count for this product first.");
@@ -186,10 +187,10 @@ export function createInventoryServer({ db, secureCookie = false, staticRoot } =
         if (activeSignIns >= 2) throw new RequestError(429, "Sign-in is busy. Try again shortly.");
         activeSignIns++;
         try {
-          const user = await checkCredentials(db, email, password);
-          if (!user) throw new RequestError(401, "Invalid email or password.");
-          const sessionCookie = createSession(db, request, user.id, secureCookie);
-          return reply(response, 200, sessionBody(db, user), { "Set-Cookie": sessionCookie });
+          const credentials = await checkCredentials(db, email, password);
+          const sessionCookie = credentials && createSession(db, request, credentials, secureCookie);
+          if (!sessionCookie) throw new RequestError(401, "Invalid email or password.");
+          return reply(response, 200, sessionBody(db, credentials.user), { "Set-Cookie": sessionCookie });
         } finally {
           activeSignIns--;
         }
@@ -207,15 +208,29 @@ export function createInventoryServer({ db, secureCookie = false, staticRoot } =
       const match = pathname.match(/^\/api\/stores\/([a-z0-9][a-z0-9-]{0,62})\/(inventory|imports|reorder)$/);
       if (!match) throw new RequestError(404, "The requested resource was not found.");
       const [, storeId, resource] = match;
-      const membership = db.prepare("SELECT role FROM memberships WHERE user_id = ? AND store_id = ?").get(user.id, storeId);
-      if (!membership) throw new RequestError(404, "The store was not found.");
+      const authorize = (managerRequired = false) => {
+        const activeUser = readSession(db, request);
+        if (!activeUser || activeUser.id !== user.id) throw new RequestError(401, "Sign in to continue.");
+        const access = db.prepare("SELECT role FROM memberships WHERE user_id = ? AND store_id = ?").get(activeUser.id, storeId);
+        if (!access) throw new RequestError(404, "The store was not found.");
+        if (managerRequired && access.role !== "manager") {
+          throw new RequestError(403, "Only store managers can import inventory.");
+        }
+        return activeUser;
+      };
 
-      if (resource === "inventory" && method === "GET") return reply(response, 200, readInventory(db, storeId));
-      if (resource === "imports" && method === "POST") {
-        if (membership.role !== "manager") throw new RequestError(403, "Only store managers can import inventory.");
-        return reply(response, 200, await importInventory(request, db, storeId, user.id));
+      if (resource === "inventory" && method === "GET") {
+        authorize();
+        return reply(response, 200, readInventory(db, storeId));
       }
-      if (resource === "reorder" && method === "POST") return reply(response, 200, await reorder(request, db, storeId));
+      if (resource === "imports" && method === "POST") {
+        authorize(true);
+        return reply(response, 200, await importInventory(request, db, storeId, () => authorize(true)));
+      }
+      if (resource === "reorder" && method === "POST") {
+        authorize();
+        return reply(response, 200, await reorder(request, db, storeId, authorize));
+      }
       throw new RequestError(405, "The requested method is not supported.");
     } catch (error) {
       if (error instanceof RequestError) return reply(response, error.status, { error: error.message, issues: error.issues });

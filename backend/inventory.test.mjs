@@ -1,9 +1,10 @@
 import { strict as assert } from "node:assert";
 import { mkdtemp, rm } from "node:fs/promises";
+import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { provisionMembership } from "./auth.mjs";
+import { grantMembership } from "./accounts.mjs";
 import { openDatabase } from "./database.mjs";
 import { createInventoryServer } from "./server.mjs";
 
@@ -16,6 +17,32 @@ async function runServer(db) {
   await new Promise((resolve, reject) => server.once("error", reject).listen(0, "127.0.0.1", resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   return {
+    async beginUpload(path, cookie, body) {
+      const payload = JSON.stringify(body);
+      const connection = request(base + path, {
+        method: "POST",
+        headers: {
+          Cookie: cookie, Expect: "100-continue",
+          "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload),
+        },
+      });
+      const result = new Promise((resolve, reject) => {
+        connection.on("error", reject);
+        connection.on("response", (response) => {
+          response.resume();
+          response.on("end", () => resolve(response.statusCode));
+        });
+      });
+      await new Promise((resolve, reject) => {
+        connection.on("error", reject);
+        connection.once("continue", resolve);
+        connection.flushHeaders();
+      });
+      return () => {
+        connection.end(payload);
+        return result;
+      };
+    },
     request(path, { method = "GET", body, cookie, headers } = {}) {
       return fetch(base + path, {
         method,
@@ -55,9 +82,9 @@ test("authenticated inventory persists across server restarts and is isolated by
     db.close();
     await rm(directory, { recursive: true, force: true });
   });
-  await provisionMembership(db, { email: "manager@north.example", password, storeId: "north", storeName: "North" });
-  await provisionMembership(db, { email: "viewer@north.example", password, storeId: "north", storeName: "North", role: "viewer" });
-  await provisionMembership(db, { email: "manager@south.example", password, storeId: "south", storeName: "South" });
+  await grantMembership(db, { actor: "test", email: "manager@north.example", password, storeId: "north", storeName: "North" });
+  await grantMembership(db, { actor: "test", email: "viewer@north.example", password, storeId: "north", storeName: "North", role: "viewer" });
+  await grantMembership(db, { actor: "test", email: "manager@south.example", password, storeId: "south", storeName: "South" });
   server = await runServer(db);
   let northCookie, southCookie, viewerCookie;
 
@@ -85,6 +112,7 @@ test("authenticated inventory persists across server restarts and is isolated by
     assert.deepEqual(await retry.json(), firstBatch);
     const { products, imports } = await get(server, north, viewerCookie);
     assert.equal(imports.length, 1);
+    assert.equal(db.prepare("SELECT count(*) AS count FROM audit_events WHERE action = 'inventory.import'").get().count, 1);
     assert.deepEqual(products[0].history, [{ month: "2026-01", soldQuantity: 32, orderedQuantity: 42 }]);
   });
 
@@ -121,6 +149,28 @@ test("authenticated inventory persists across server restarts and is isolated by
     assert.equal(noStock.status, 422);
     const invalidInputs = await post(server, north + "/reorder", viewerCookie, { ...inputs, incomingStock: -1 });
     assert.equal(invalidInputs.status, 422);
+  });
+
+
+  await t.test("an import rechecks the session and manager role after the request body arrives", async () => {
+    await grantMembership(db, { actor: "test", email: "second@north.example", password, storeId: "north", storeName: "North" });
+    const csv = csvRows("SKU-3,Test Beans,2026-04-01,10,8,4");
+    const finishDemoted = await server.beginUpload(north + "/imports", northCookie, { fileName: "late.csv", csv });
+    await grantMembership(db, {
+      actor: "test", email: "manager@north.example", storeId: "north", storeName: "North", role: "viewer",
+    });
+    assert.equal(await finishDemoted(), 403);
+    await grantMembership(db, {
+      actor: "test", email: "manager@north.example", storeId: "north", storeName: "North", role: "manager",
+    });
+
+    const finishSignedOut = await server.beginUpload(north + "/imports", northCookie, { fileName: "late.csv", csv });
+    assert.equal((await server.request("/api/session", { method: "DELETE", cookie: northCookie })).status, 204);
+    assert.equal(await finishSignedOut(), 401);
+    northCookie = (await login(server, "manager@north.example")).cookie;
+    const { products, imports } = await get(server, north, northCookie);
+    assert.equal(products.length, 2);
+    assert.equal(imports.length, 2);
   });
 
   await t.test("data is durable and signing out revokes the session", async () => {
