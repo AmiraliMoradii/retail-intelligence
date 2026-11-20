@@ -3,16 +3,8 @@ import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-export function openDatabase(file = process.env.RI_DB_PATH ?? ".ri-data/inventory.sqlite") {
-  if (file !== ":memory:") {
-    file = resolve(file);
-    mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
-  }
-  const db = new DatabaseSync(file);
-  db.exec(`
-    PRAGMA journal_mode = WAL;
-    PRAGMA foreign_keys = ON;
-    PRAGMA busy_timeout = 5000;
+const migrations = [
+  `
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       email TEXT NOT NULL UNIQUE,
@@ -64,8 +56,61 @@ export function openDatabase(file = process.env.RI_DB_PATH ?? ".ri-data/inventor
       PRIMARY KEY (store_id, id),
       UNIQUE (store_id, digest)
     ) STRICT;
-  `);
-  return db;
+  `,
+  `
+    ALTER TABLE users ADD COLUMN disabled_at TEXT;
+    ALTER TABLE users ADD COLUMN credential_version INTEGER NOT NULL DEFAULT 1;
+    CREATE INDEX sessions_by_user ON sessions(user_id);
+    CREATE TABLE audit_events (
+      id INTEGER PRIMARY KEY,
+      occurred_at TEXT NOT NULL,
+      action TEXT NOT NULL,
+      actor TEXT NOT NULL,
+      user_id TEXT REFERENCES users(id),
+      store_id TEXT REFERENCES stores(id),
+      import_id TEXT,
+      from_role TEXT,
+      to_role TEXT,
+      FOREIGN KEY (store_id, import_id) REFERENCES imports(store_id, id)
+    ) STRICT;
+    CREATE TRIGGER audit_events_no_update BEFORE UPDATE ON audit_events
+      BEGIN SELECT RAISE(ABORT, 'Audit events cannot be updated.'); END;
+    CREATE TRIGGER audit_events_no_delete BEFORE DELETE ON audit_events
+      BEGIN SELECT RAISE(ABORT, 'Audit events cannot be deleted.'); END;
+  `,
+];
+
+export const DATABASE_VERSION = migrations.length;
+
+export function openDatabase(file = process.env.RI_DB_PATH ?? ".ri-data/inventory.sqlite") {
+  if (file !== ":memory:") {
+    file = resolve(file);
+    mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+  }
+  const db = new DatabaseSync(file);
+  try {
+    db.exec("PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
+    transaction(db, () => {
+      const version = db.prepare("PRAGMA user_version").get().user_version;
+      if (version > DATABASE_VERSION) throw new Error("The database requires a newer application version.");
+      // The original preview database did not set a schema version. Migration 1 recognizes its existing tables.
+      for (let next = version + 1; next <= DATABASE_VERSION; next++) {
+        db.exec(migrations[next - 1]);
+        db.exec(`PRAGMA user_version = ${next}`);
+      }
+    });
+    return db;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+export function appendAudit(db, { action, actor, userId = null, storeId = null, importId = null, fromRole = null, toRole = null }) {
+  db.prepare(`
+    INSERT INTO audit_events (occurred_at, action, actor, user_id, store_id, import_id, from_role, to_role)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(new Date().toISOString(), action, actor, userId, storeId, importId, fromRole, toRole);
 }
 
 export function transaction(db, work) {
@@ -150,9 +195,10 @@ export function groupInventoryRows(records) {
   return { groups };
 }
 
-export function saveImport(db, { storeId, userId, fileName, csv, rowCount, groups }) {
+export function saveImport(db, { storeId, fileName, csv, rowCount, groups, authorize }) {
   const digest = createHash("sha256").update(csv).digest("hex");
   return transaction(db, () => {
+    const { id: userId } = authorize();
     const prior = db.prepare("SELECT data FROM imports WHERE store_id = ? AND digest = ?").get(storeId, digest);
     if (prior) return JSON.parse(prior.data);
 
@@ -204,6 +250,7 @@ export function saveImport(db, { storeId, userId, fileName, csv, rowCount, group
     }
     db.prepare("INSERT INTO imports (store_id, id, user_id, digest, data) VALUES (?, ?, ?, ?, ?)")
       .run(storeId, batch.id, userId, digest, JSON.stringify(batch));
+    appendAudit(db, { action: "inventory.import", actor: `user:${userId}`, userId, storeId, importId: batch.id });
     return batch;
   });
 }

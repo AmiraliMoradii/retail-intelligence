@@ -6,7 +6,7 @@ Amirali Moradi developed Retail Intelligence for CPSC 598 Software Entrepreneurs
 
 ## Try the sample store
 
-Open the sample store, then use **Data Management** to try a valid and an invalid inventory CSV. In **Inventory**, review the updated Whole Wheat Bread history. In **Demand Forecasting**, select **Load example** for a 200-unit reorder calculation.
+[Open the online demo](https://amiralimoradii.github.io/retail-intelligence/) without an account, then use **Data Management** to try a valid and an invalid inventory CSV. In **Inventory**, review the updated Whole Wheat Bread history. In **Demand Forecasting**, select **Load example** for a 200-unit reorder calculation.
 
 The public preview uses bundled synthetic data and stores changes in your browser. Aisle traffic and forecasts are simulated.
 
@@ -69,6 +69,8 @@ GitHub Actions is configured to run the same checks after a clean install. The a
 The forecast benchmark holds out the last three months for each of 24 synthetic products. Predicting the last observed month scores 27.40 units MAE and 12.38% WAPE. The two versions of the demo heuristic score 24.74 and 25.74 units MAE, and 11.18% and 11.63% WAPE. Real-store performance and model-specific accuracy still require testing on representative data.
 
 ## Before a store pilot
+
+See the [pilot operations runbook](docs/PILOT-OPERATIONS.md) for account administration and backup drills, and the [forecast evaluation guide](docs/FORECAST-EVALUATION.md) for checking monthly demand baselines.
 
 Validate the CSV conventions against a store's exports and agree on how staff handle adjustments, stock dates, and planning periods. Deploy behind HTTPS with `RI_SECURE_COOKIE=1`, put SQLite on backed-up durable storage, test restoration, and establish account recovery, revocation, and audit monitoring. The preview uses local provisioning and has no account administration UI. Start with inventory and review the results with staff before making purchasing decisions from them.
 
