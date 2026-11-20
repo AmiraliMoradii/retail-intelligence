@@ -35,6 +35,7 @@ import { BrandMark } from "./BrandMark";
 import { DemoBadge } from "@/components/shared/DemoBadge";
 import { ResetDemoDialog } from "@/components/shared/ResetDemoDialog";
 import { NAV_ITEMS } from "@/config/navigation";
+import { PUBLIC_DEMO } from "@/config/demo";
 import { DATE_RANGES } from "@/services/analyticsService";
 import { useAppStore } from "@/store/useAppStore";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -50,7 +51,8 @@ const NOTIF_ICON: Record<AppNotification["kind"], typeof Bell> = {
 
 function NotificationsMenu() {
   const navigate = useNavigate();
-  const notifications = useAppStore((s) => s.notifications);
+  const allNotifications = useAppStore((s) => s.notifications);
+  const notifications = PUBLIC_DEMO ? allNotifications.filter((item) => item.kind !== "processing") : allNotifications;
   const markRead = useAppStore((s) => s.markNotificationRead);
   const markAll = useAppStore((s) => s.markAllNotificationsRead);
   const [open, setOpen] = useState(false);
@@ -221,14 +223,16 @@ function UserMenu() {
           <DropdownMenuItem onSelect={() => navigate("/settings")}>
             <Settings /> Settings
           </DropdownMenuItem>
-          <DropdownMenuItem
-            onSelect={() => {
-              setOnboarding({ completed: false, step: 0, maxStep: 0 });
-              navigate("/onboarding");
-            }}
-          >
-            <Wand2 /> Restart store setup
-          </DropdownMenuItem>
+          {!PUBLIC_DEMO && (
+            <DropdownMenuItem
+              onSelect={() => {
+                setOnboarding({ completed: false, step: 0, maxStep: 0 });
+                navigate("/onboarding");
+              }}
+            >
+              <Wand2 /> Restart store setup
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onSelect={() => setResetOpen(true)}>
             <RotateCcw /> Reset demo data
           </DropdownMenuItem>
@@ -240,7 +244,7 @@ function UserMenu() {
               navigate("/login", { replace: true });
             }}
           >
-            <LogOut /> Sign out
+            <LogOut /> {PUBLIC_DEMO ? "Exit sample store" : "Sign out"}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

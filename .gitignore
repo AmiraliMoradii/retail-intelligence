@@ -9,3 +9,5 @@ dist
 *.sqlite-shm
 *.sqlite-wal
 /.ri-data/
+/playwright-report/
+/test-results/

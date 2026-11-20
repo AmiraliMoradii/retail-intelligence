@@ -6,6 +6,7 @@ import { Header } from "./Header";
 import { PageLoading } from "@/components/shared/LoadingState";
 import { NAV_ITEMS } from "@/config/navigation";
 import { BRAND } from "@/config/brand";
+import { PUBLIC_DEMO } from "@/config/demo";
 import { resumeProcessingJobs } from "@/services/mockApi";
 
 const COLLAPSE_KEY = "ri-sidebar-collapsed";
@@ -49,7 +50,14 @@ export function AppLayout() {
   return (
     <div className="flex min-h-dvh bg-background">
       <a
-        href="#main-content"
+        href={PUBLIC_DEMO ? `#${location.pathname}${location.search}#main-content` : "#main-content"}
+        onClick={(event) => {
+          if (!PUBLIC_DEMO || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+          event.preventDefault();
+          // Changing the fragment directly would replace the route on static hosting.
+          mainRef.current?.focus({ preventScroll: true });
+          mainRef.current?.scrollIntoView();
+        }}
         className="sr-only z-50 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
       >
         Skip to main content
@@ -64,7 +72,7 @@ export function AppLayout() {
           id="main-content"
           ref={mainRef}
           tabIndex={-1}
-          className="mx-auto w-full max-w-[1600px] min-w-0 flex-1 overflow-x-clip px-4 py-6 outline-none sm:px-6 lg:px-8 lg:py-8"
+          className="mx-auto w-full max-w-[1600px] min-w-0 flex-1 scroll-mt-32 overflow-x-clip px-4 py-6 outline-none sm:px-6 lg:px-8 lg:py-8"
         >
           <Suspense fallback={<PageLoading />}>
             <div key={location.pathname} className="page-enter">

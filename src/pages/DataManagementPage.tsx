@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { DemoBadge } from "@/components/shared/DemoBadge";
+import { PUBLIC_DEMO } from "@/config/demo";
 import { CSVUploader, SAMPLE_FILES } from "@/components/uploads/CSVUploader";
 import { VideoUploader } from "@/components/uploads/VideoUploader";
 import { VideoLibrary } from "@/components/cameras/VideoLibrary";
@@ -55,9 +56,11 @@ function InventoryTab() {
         <Card>
           <CardHeader>
             <div>
-              <CardTitle>Upload inventory CSV</CardTitle>
+              <CardTitle>{PUBLIC_DEMO ? "Import a sample CSV" : "Upload inventory CSV"}</CardTitle>
               <CardDescription>
-                Import historical sales and ordering records. Files are parsed and validated in your browser before anything is imported.
+                {PUBLIC_DEMO
+                  ? "Choose a bundled file to see how inventory validation and import work."
+                  : "Import historical sales and ordering records. Files are validated in your browser before they are imported."}
               </CardDescription>
             </div>
           </CardHeader>
@@ -303,31 +306,33 @@ export default function DataManagementPage() {
       <PageHeader
         eyebrow={<DemoBadge />}
         title="Data Management"
-        description="Manage inventory datasets and video sources used for retail analytics."
+        description={PUBLIC_DEMO ? "Try inventory imports with bundled sample files." : "Manage inventory datasets and video sources used for retail analytics."}
       />
-      <Tabs
-        value={tab}
-        onValueChange={(v) => {
-          const next = new URLSearchParams(params);
-          next.set("tab", v);
-          setParams(next);
-        }}
-      >
-        <TabsList aria-label="Data type">
-          <TabsTrigger value="inventory">
-            <FileSpreadsheet aria-hidden="true" /> Inventory Data
-          </TabsTrigger>
-          <TabsTrigger value="video">
-            <Video aria-hidden="true" /> Video Data
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="inventory">
-          <InventoryTab />
-        </TabsContent>
-        <TabsContent value="video">
-          <VideoTab />
-        </TabsContent>
-      </Tabs>
+      {import.meta.env.VITE_PUBLIC_DEMO === "1" ? <InventoryTab /> : (
+        <Tabs
+          value={tab}
+          onValueChange={(v) => {
+            const next = new URLSearchParams(params);
+            next.set("tab", v);
+            setParams(next);
+          }}
+        >
+          <TabsList aria-label="Data type">
+            <TabsTrigger value="inventory">
+              <FileSpreadsheet aria-hidden="true" /> Inventory Data
+            </TabsTrigger>
+            <TabsTrigger value="video">
+              <Video aria-hidden="true" /> Video Data
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="inventory">
+            <InventoryTab />
+          </TabsContent>
+          <TabsContent value="video">
+            <VideoTab />
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   );
 }

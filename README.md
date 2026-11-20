@@ -2,9 +2,17 @@
 
 Retail Intelligence helps grocery-store managers import sales and stock data, review product history, and calculate how many units to reorder. This is an **inventory evaluation preview**. It includes a browser demo and a self-hosted inventory workflow.
 
-Amirali Moradi developed Retail Intelligence for CPSC 598 Software Entrepreneurship at the University of Calgary. The project first appeared in the [repository published by faraz-hsn](https://github.com/faraz-hsn/AI-Inventory). This repository preserves that commit history. The original repository does not declare a software license.
+Amirali Moradi developed Retail Intelligence for CPSC 598 Software Entrepreneurship at the University of Calgary. The project first appeared in the [repository published by faraz-hsn](https://github.com/faraz-hsn/AI-Inventory). This repository preserves that commit history. The project uses the [MIT license](LICENSE). The bundled [Inter font](public/INTER-LICENSE.txt) and other dependencies retain their own licenses.
 
-## Try the sample-data demo
+## Try the sample store
+
+Open the sample store, then use **Data Management** to try a valid and an invalid inventory CSV. In **Inventory**, review the updated Whole Wheat Bread history. In **Demand Forecasting**, select **Load example** for a 200-unit reorder calculation.
+
+The public preview uses bundled synthetic data and stores changes in your browser. Aisle traffic and forecasts are simulated.
+
+![Retail Intelligence demo overview with synthetic aisle traffic and inventory metrics](docs/screenshots/demo-overview.jpg)
+
+### Run the demo locally
 
 Use Node.js 24 and npm.
 
@@ -16,8 +24,6 @@ npm run dev
 Open the URL printed by Vite. Select **Use demo account**, sign in, and finish or skip store setup. In **Data Management**, choose **Try a sample file**. The invalid quantity sample shows an error on row 8. The valid sample imports 36 rows across three products. Open **Inventory** to review the updated Whole Wheat Bread history. In **Demand Forecasting**, select **Load example** to see how the reorder calculation produces 200 units.
 
 The demo saves changes in your browser. Use bundled samples or synthetic records. Demo sign-in, aisle analytics, camera processing, and demand forecasts are simulated. [Demo walkthrough](docs/DEMO_SCRIPT.md)
-
-![Retail Intelligence demo overview with synthetic aisle traffic and inventory metrics](docs/screenshots/demo-overview.jpg)
 
 ## Try the self-hosted inventory workflow
 
@@ -52,10 +58,13 @@ Store data and sessions are stored in SQLite at `.ri-data/inventory.sqlite` by d
 npm run typecheck
 npm test
 npm run benchmark:forecast
-VITE_STORE_INVENTORY=1 npm run build
+VITE_STORE_INVENTORY=1 npm run build -- --outDir dist/store
+VITE_PUBLIC_DEMO=1 npm run build -- --base /retail-intelligence/ --outDir dist/demo
+npx playwright install chromium
+npm run test:e2e
 ```
 
-GitHub Actions is configured to run the same checks after a clean install. The automated suite exercises CSV validation, store isolation, viewer permissions, import retries, dated stock, and persistence across a server restart. For a change to import behavior, include a small synthetic CSV that shows what should happen. For UI changes, include the route and steps for testing with a keyboard and a phone-width viewport.
+GitHub Actions is configured to run the same checks after a clean install. The automated suite exercises CSV validation, store isolation, viewer permissions, import retries, dated stock, and persistence across a server restart. Chromium tests both builds at desktop and phone widths. See [Contributing](CONTRIBUTING.md) before opening a pull request. For a change to import behavior, include a small synthetic CSV that shows what should happen. For UI changes, include the route and steps for testing with a keyboard and a phone-width viewport.
 
 The forecast benchmark holds out the last three months for each of 24 synthetic products. Predicting the last observed month scores 27.40 units MAE and 12.38% WAPE. The two versions of the demo heuristic score 24.74 and 25.74 units MAE, and 11.18% and 11.63% WAPE. Real-store performance and model-specific accuracy still require testing on representative data.
 
