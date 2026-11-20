@@ -6,7 +6,7 @@ Amirali Moradi developed Retail Intelligence for CPSC 598 Software Entrepreneurs
 
 ## Try the sample store
 
-Open the sample store, then use **Data Management** to try a valid and an invalid inventory CSV. In **Inventory**, review the updated Whole Wheat Bread history. In **Demand Forecasting**, select **Load example** for a 200-unit reorder calculation.
+[Open the online demo](https://amiralimoradii.github.io/retail-intelligence/) without an account, then use **Data Management** to try a valid and an invalid inventory CSV. In **Inventory**, review the updated Whole Wheat Bread history. In **Demand Forecasting**, select **Load example** for a 200-unit reorder calculation.
 
 The public preview uses bundled synthetic data and stores changes in your browser. Aisle traffic and forecasts are simulated.
 

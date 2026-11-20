@@ -49,9 +49,13 @@ Label is `help wanted`.
 
 I built Retail Intelligence for a University of Calgary course and am sharing an evaluation preview. The online demo lets you import a sample inventory CSV and see its effect on product history and reorder quantities. There is also a self-hosted workflow with SQLite and store-level access. If you are interested in inventory tooling, the dated stock CSV issue is a small place to start. I would also welcome reproducible accessibility or data import reports.
 
+[Try the demo](https://amiralimoradii.github.io/retail-intelligence/) · [Dated stock CSV issue](https://github.com/AmiraliMoradii/retail-intelligence/issues/1)
+
 ## Feedback request for store managers
 
 I’m testing a grocery inventory tool that imports monthly sales and stock counts from CSV. The sample store shows how an import changes product history and the reorder calculation. When you correct a sale or stock count from a previous month, how does your export represent the change? A description or made-up example is enough.
+
+[Try the sample store](https://amiralimoradii.github.io/retail-intelligence/)
 
 ## Measure participation
 
