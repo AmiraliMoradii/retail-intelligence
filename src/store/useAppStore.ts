@@ -170,7 +170,11 @@ const toCategory = (raw?: string): ProductCategory => {
 /** Merge parsed CSV records into the product list (monthly aggregation, newest values win). */
 function mergeRecords(products: Product[], records: InventoryRecord[], importedAt: string) {
   const groups = new Map<string, InventoryRecord[]>();
-  for (const r of records) groups.set(r.product_id, [...(groups.get(r.product_id) ?? []), r]);
+  for (const record of records) {
+    const group = groups.get(record.product_id);
+    if (group) group.push(record);
+    else groups.set(record.product_id, [record]);
+  }
 
   const next = products.map((p) => ({ ...p, history: [...p.history] }));
   const productIds: string[] = [];

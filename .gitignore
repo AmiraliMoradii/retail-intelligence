@@ -4,3 +4,8 @@ dist
 .DS_Store
 .vite
 .claude/
+/data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+/.ri-data/

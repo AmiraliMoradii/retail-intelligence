@@ -33,7 +33,7 @@ export interface CsvParseResult {
 const normalise = (h: string) => h.trim().toLowerCase().replace(/\s+/g, "_");
 
 /** File-level checks that run before parsing. Messages are written for store managers. */
-export function validateCsvFile(file: File): CsvIssue | null {
+export function validateCsvFile(file: { name: string; size: number }): CsvIssue | null {
   if (!/\.csv$/i.test(file.name)) {
     return { code: "invalid_type", message: "Unsupported file format. Please upload a CSV file." };
   }
@@ -46,32 +46,60 @@ export function validateCsvFile(file: File): CsvIssue | null {
 const QUANTITY_COLUMNS = ["ordered_quantity", "sold_quantity", "current_stock", "supplier_lead_time"] as const;
 
 function isValidQuantity(v: string) {
-  return /^\d+(\.0+)?$/.test(v.trim());
+  return /^\d+(\.0+)?$/.test(v.trim()) && Number.isSafeInteger(Number(v));
 }
 
 function isValidDate(v: string) {
-  return /^\d{4}-\d{2}(-\d{2})?$/.test(v.trim()) && !Number.isNaN(new Date(v.trim().length === 7 ? `${v}-01` : v).getTime());
+  const value = v.trim();
+  if (!/^\d{4}-\d{2}(-\d{2})?$/.test(value)) return false;
+  const day = value.length === 7 ? `${value}-01` : value;
+  const date = new Date(day);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === day;
 }
 
-/**
- * Parses and validates an inventory CSV in the browser with PapaParse.
- * Row numbers in messages count data rows (the header is not counted), matching what a
- * manager sees when they open the file in a spreadsheet and ignore the header line.
- */
-export function parseInventoryCsv(file: File): Promise<CsvParseResult> {
-  return new Promise((resolve) => {
-    Papa.parse<Record<string, string>>(file, {
-      header: true,
-      skipEmptyLines: "greedy",
-      transformHeader: normalise,
-      complete: (results) => resolve(validateParsed(file.name, file.size, results.meta.fields ?? [], results.data)),
-      error: () =>
-        resolve({
-          ...emptyResult(file.name, file.size),
-          issues: [{ code: "parse_error", message: "We couldn't read this file. Check that it is a comma-separated CSV and try again." }],
-        }),
-    });
+export function parseInventoryCsvText(fileName: string, sizeBytes: number, text: string): CsvParseResult {
+  const fileIssue = validateCsvFile({ name: fileName, size: sizeBytes });
+  if (fileIssue) return { ...emptyResult(fileName, sizeBytes), issues: [fileIssue] };
+
+  const { data, meta, errors } = Papa.parse<Record<string, string>>(text, {
+    delimiter: ",",
+    header: true,
+    skipEmptyLines: "greedy",
+    transformHeader: normalise,
   });
+  const result = validateParsed(fileName, sizeBytes, meta.fields ?? [], data);
+  for (const header of new Set(Object.values(meta.renamedHeaders ?? {}))) {
+    result.issues.push({
+      code: "parse_error",
+      column: header,
+      message: `The column ${header} appears more than once.`,
+    });
+  }
+  for (const error of errors) {
+    const row = error.row === undefined ? undefined : error.row + 1;
+    const location = row === undefined ? "The file" : `Row ${row}`;
+    result.issues.push({
+      code: "parse_error",
+      row,
+      message: `${location} could not be read. Check the number of fields and any quoted values.`,
+    });
+  }
+  result.ok = result.issues.length === 0;
+  if (!result.ok) result.records = [];
+  return result;
+}
+
+export async function parseInventoryCsv(file: File): Promise<CsvParseResult> {
+  const fileIssue = validateCsvFile(file);
+  if (fileIssue) return { ...emptyResult(file.name, file.size), issues: [fileIssue] };
+  try {
+    return parseInventoryCsvText(file.name, file.size, await file.text());
+  } catch {
+    return {
+      ...emptyResult(file.name, file.size),
+      issues: [{ code: "parse_error", message: "We couldn't read this file. Check that it is a comma-separated CSV and try again." }],
+    };
+  }
 }
 
 function emptyResult(fileName: string, sizeBytes: number): CsvParseResult {
@@ -129,17 +157,18 @@ export function validateParsed(
         code: "invalid_value",
         row: rowNo,
         column: "date",
-        message: `Row ${rowNo} contains an invalid date value. Use YYYY-MM-DD.`,
+        message: `Row ${rowNo} contains an invalid date value. Use YYYY-MM or YYYY-MM-DD.`,
       });
     }
     for (const col of QUANTITY_COLUMNS) {
       const v = row[col];
-      if (v === undefined || (v.trim() === "" && !(REQUIRED_COLUMNS as readonly string[]).includes(col))) continue;
-      if (!isValidQuantity(v)) {
+      const required = col === "ordered_quantity" || col === "sold_quantity";
+      if (!required && !v?.trim()) continue;
+      if (!isValidQuantity(v ?? "")) {
         result.issues.push({ code: "invalid_value", row: rowNo, column: col, message: `Row ${rowNo} contains an invalid ${col} value.` });
       }
     }
-    if (row.unit_cost?.trim() && !/^\d+(\.\d+)?$/.test(row.unit_cost.trim())) {
+    if (row.unit_cost?.trim() && (!/^\d+(\.\d+)?$/.test(row.unit_cost.trim()) || !Number.isFinite(Number(row.unit_cost)))) {
       result.issues.push({ code: "invalid_value", row: rowNo, column: "unit_cost", message: `Row ${rowNo} contains an invalid unit_cost value.` });
     }
     records.push({
@@ -155,23 +184,26 @@ export function validateParsed(
     });
   });
 
-  result.records = records;
+  result.ok = result.issues.length === 0;
+  if (result.ok) result.records = records;
   result.productCount = new Set(records.map((r) => r.product_id)).size;
   const dates = records.map((r) => r.date).filter(Boolean).sort();
   result.dateRange = dates.length ? { from: dates[0], to: dates[dates.length - 1] } : null;
-  result.ok = result.issues.length === 0;
   return result;
 }
 
 /** Fetch one of the bundled sample files from /public/samples and run it through the same parser. */
 export async function loadSampleCsv(name: string): Promise<File> {
   const res = await fetch(`${import.meta.env.BASE_URL}samples/${name}`);
+  if (!res.ok) throw new Error(`Sample request failed with HTTP ${res.status}`);
   const text = await res.text();
   return new File([text], name, { type: name.endsWith(".csv") ? "text/csv" : "text/plain" });
 }
 
 export function downloadCsv(fileName: string, rows: Record<string, unknown>[] | unknown[][], header?: string[]) {
-  const csv = header ? Papa.unparse({ fields: header, data: rows as unknown[][] }) : Papa.unparse(rows as Record<string, unknown>[]);
+  const data = header ? { fields: header, data: rows as unknown[][] } : rows;
+  // Imported product text should remain text when the export opens in a spreadsheet.
+  const csv = Papa.unparse<unknown>(data, { escapeFormulae: true });
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

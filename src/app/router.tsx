@@ -14,7 +14,12 @@ const DataManagementPage = lazy(() => import("@/pages/DataManagementPage"));
 const CameraConfigurationPage = lazy(() => import("@/pages/CameraConfigurationPage"));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
 
+const StoreInventoryPage = lazy(() => import("@/pages/StoreInventoryPage"));
+
 export const router = createBrowserRouter([
+  ...(import.meta.env.VITE_STORE_INVENTORY === "1"
+    ? [{ path: "/store-inventory", element: <StoreInventoryPage /> }]
+    : []),
   {
     element: <RedirectIfAuthed />,
     children: [{ path: "/login", element: <LoginPage /> }],

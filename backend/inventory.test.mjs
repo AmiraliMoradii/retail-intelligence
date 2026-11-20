@@ -1,0 +1,137 @@
+import { strict as assert } from "node:assert";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { test } from "node:test";
+import { provisionMembership } from "./auth.mjs";
+import { openDatabase } from "./database.mjs";
+import { createInventoryServer } from "./server.mjs";
+
+const password = "integration-fixture-password";
+const csvHead = "product_id,product_name,date,ordered_quantity,sold_quantity,current_stock";
+const csvRows = (...rows) => [csvHead, ...rows].join("\n");
+
+async function runServer(db) {
+  const server = createInventoryServer({ db });
+  await new Promise((resolve, reject) => server.once("error", reject).listen(0, "127.0.0.1", resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  return {
+    request(path, { method = "GET", body, cookie, headers } = {}) {
+      return fetch(base + path, {
+        method,
+        headers: { ...(body && { "Content-Type": "application/json" }), ...(cookie && { Cookie: cookie }), ...headers },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+    },
+    close: () => new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve())),
+  };
+}
+
+async function login(server, email) {
+  const response = await server.request("/api/session", { method: "POST", body: { email, password } });
+  assert.equal(response.status, 200);
+  const cookie = response.headers.get("set-cookie");
+  assert.match(cookie, /; HttpOnly; SameSite=Strict/);
+  return { cookie: cookie.split(";")[0], session: await response.json() };
+}
+
+const south = "/api/stores/south";
+const north = "/api/stores/north";
+const post = (server, path, cookie, body) => server.request(path, { method: "POST", cookie, body });
+const upload = (server, store, cookie, csv, fileName = "inventory.csv") => post(server, store + "/imports", cookie, { fileName, csv });
+const get = async (server, store, cookie) => {
+  const response = await server.request(store + "/inventory", { cookie });
+  assert.equal(response.status, 200);
+  return response.json();
+};
+
+test("authenticated inventory persists across server restarts and is isolated by store and role", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "retail-inventory-test-"));
+  const file = join(directory, "inventory.sqlite");
+  let db = openDatabase(file);
+  let server;
+  t.after(async () => {
+    await server?.close();
+    db.close();
+    await rm(directory, { recursive: true, force: true });
+  });
+  await provisionMembership(db, { email: "manager@north.example", password, storeId: "north", storeName: "North" });
+  await provisionMembership(db, { email: "viewer@north.example", password, storeId: "north", storeName: "North", role: "viewer" });
+  await provisionMembership(db, { email: "manager@south.example", password, storeId: "south", storeName: "South" });
+  server = await runServer(db);
+  let northCookie, southCookie, viewerCookie;
+
+  await t.test("sign-in and membership", async () => {
+    assert.equal((await server.request(north + "/inventory")).status, 401);
+    assert.equal((await post(server, "/api/session", null, { email: "manager@north.example", password: "wrong" })).status, 401);
+    const loginResponse = await login(server, "manager@north.example");
+    northCookie = loginResponse.cookie;
+    assert.deepEqual(loginResponse.session.stores, [{ id: "north", name: "North", role: "manager" }]);
+    const crossSite = await server.request("/api/session", { cookie: northCookie, headers: { "Sec-Fetch-Site": "cross-site" } });
+    assert.equal(crossSite.status, 403);
+    southCookie = (await login(server, "manager@south.example")).cookie;
+    viewerCookie = (await login(server, "viewer@north.example")).cookie;
+  });
+
+  const first = csvRows("SKU-1,North Beans,2026-01-10,24,20,60", "SKU-1,North Beans,2026-01-20,18,12,60");
+  await t.test("bad files do not write data; repeated valid imports only write once", async () => {
+    const invalid = await upload(server, north, northCookie, csvRows("SKU-1,North Beans,2026-02-30,24,20,60"));
+    assert.equal(invalid.status, 422);
+    assert.deepEqual(await get(server, north, northCookie), { products: [], imports: [] });
+    const firstResponse = await upload(server, north, northCookie, first);
+    assert.equal(firstResponse.status, 200);
+    const firstBatch = await firstResponse.json();
+    const retry = await upload(server, north, northCookie, first, "renamed.csv");
+    assert.deepEqual(await retry.json(), firstBatch);
+    const { products, imports } = await get(server, north, viewerCookie);
+    assert.equal(imports.length, 1);
+    assert.deepEqual(products[0].history, [{ month: "2026-01", soldQuantity: 32, orderedQuantity: 42 }]);
+  });
+
+  await t.test("store members can only read and write their own store; viewers cannot import", async () => {
+    const otherStoreCsv = csvRows("SKU-1,South Beans,2026-01-20,3,2,7");
+    const viewerWrite = await upload(server, north, viewerCookie, otherStoreCsv);
+    assert.equal(viewerWrite.status, 403);
+    assert.equal((await server.request(south + "/inventory", { cookie: northCookie })).status, 404);
+    assert.equal((await upload(server, south, northCookie, otherStoreCsv)).status, 404);
+    assert.equal((await post(server, south + "/reorder", northCookie, {
+      productId: "SKU-1", forecastDemand: 100, safetyStock: 0, incomingStock: 0,
+    })).status, 404);
+    assert.equal((await upload(server, south, southCookie, otherStoreCsv)).status, 200);
+    assert.equal((await get(server, south, southCookie)).products[0].name, "South Beans");
+    assert.equal((await get(server, north, northCookie)).products[0].name, "North Beans");
+  });
+
+  await t.test("overlapping history is replaced, older stock is ignored, and reorder returns its inputs", async () => {
+    const historyUpdate = csvRows("SKU-1,Old Name,2026-01-02,11,9,87", "SKU-2,Stock Unknown,2026-02-01,12,8,");
+    assert.equal((await upload(server, north, northCookie, historyUpdate)).status, 200);
+    const { products } = await get(server, north, northCookie);
+    assert.equal(products[0].name, "North Beans");
+    assert.equal(products[0].currentStock, 60);
+    assert.equal(products[0].stockDate, "2026-01-20");
+    assert.equal(products[0].history[0].soldQuantity, 9);
+
+    const inputs = { productId: "SKU-1", forecastDemand: 250, safetyStock: 30, incomingStock: 20 };
+    const quote = await post(server, north + "/reorder", viewerCookie, inputs);
+    assert.equal(quote.status, 200);
+    assert.deepEqual(await quote.json(), {
+      ...inputs, currentStock: 60, stockDate: "2026-01-20", formulaVersion: 1, recommendedOrder: 200,
+    });
+    const noStock = await post(server, north + "/reorder", viewerCookie, { ...inputs, productId: "SKU-2" });
+    assert.equal(noStock.status, 422);
+    const invalidInputs = await post(server, north + "/reorder", viewerCookie, { ...inputs, incomingStock: -1 });
+    assert.equal(invalidInputs.status, 422);
+  });
+
+  await t.test("data is durable and signing out revokes the session", async () => {
+    await server.close();
+    server = undefined;
+    db.close();
+    db = openDatabase(file);
+    server = await runServer(db);
+    assert.equal((await get(server, north, northCookie)).imports.length, 2);
+    assert.equal((await get(server, north, northCookie)).products[0].currentStock, 60);
+    assert.equal((await server.request("/api/session", { method: "DELETE", cookie: northCookie })).status, 204);
+    assert.equal((await server.request(north + "/inventory", { cookie: northCookie })).status, 401);
+  });
+});

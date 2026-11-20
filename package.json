@@ -8,6 +8,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --noEmit",
+    "test": "node --test",
+    "benchmark:forecast": "node scripts/benchmark-forecast.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

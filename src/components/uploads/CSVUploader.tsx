@@ -11,7 +11,6 @@ import {
   MinusCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -32,7 +31,6 @@ import {
   validateCsvFile,
   type CsvParseResult,
 } from "@/services/csvService";
-import { latency } from "@/services/mockApi";
 import { formatBytes, formatNumber } from "@/utils/formatters";
 import { cn } from "@/lib/utils";
 
@@ -58,69 +56,86 @@ export interface CSVUploaderProps {
 
 export function CSVUploader({ onImport, successActions, confirmLabel = "Confirm import", className, hideSamples }: CSVUploaderProps) {
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const chooseFileRef = React.useRef<HTMLButtonElement>(null);
+  const outcomeRef = React.useRef<HTMLDivElement>(null);
+  const focusOnReset = React.useRef(false);
+  const busy = React.useRef(false);
   const [phase, setPhase] = React.useState<Phase>("idle");
   const [dragOver, setDragOver] = React.useState(false);
-  const [progress, setProgress] = React.useState(0);
   const [file, setFile] = React.useState<{ name: string; size: number } | null>(null);
   const [fileError, setFileError] = React.useState<string | null>(null);
   const [result, setResult] = React.useState<CsvParseResult | null>(null);
-  const inputId = React.useId();
-  const statusId = React.useId();
+  const [importFailed, setImportFailed] = React.useState(false);
+
+  React.useEffect(() => {
+    if (phase === "idle" && focusOnReset.current) {
+      focusOnReset.current = false;
+      chooseFileRef.current?.focus();
+    }
+    if (phase === "parsed" || phase === "imported") outcomeRef.current?.focus();
+  }, [phase, importFailed]);
 
   const reset = () => {
+    focusOnReset.current = true;
     setPhase("idle");
-    setProgress(0);
     setFile(null);
     setFileError(null);
     setResult(null);
-    if (inputRef.current) inputRef.current.value = "";
+    setImportFailed(false);
   };
 
-  const handleFile = async (f: File) => {
-    setFile({ name: f.name, size: f.size });
+  const readFile = async (name: string, read: () => Promise<File>) => {
+    if (busy.current) return;
+    busy.current = true;
+    setFile({ name, size: 0 });
     setResult(null);
-    const fileIssue = validateCsvFile(f);
-    if (fileIssue) {
-      setFileError(fileIssue.message);
-      setPhase("parsed");
-      return;
-    }
     setFileError(null);
+    setImportFailed(false);
     setPhase("reading");
-    // Simulated upload progress (files are read locally in the browser — nothing is sent anywhere).
-    for (const p of [18, 42, 67, 88]) {
-      setProgress(p);
-      await latency(110);
+    try {
+      const selected = await read();
+      setFile({ name: selected.name, size: selected.size });
+      const issue = validateCsvFile(selected);
+      if (issue) {
+        setFileError(issue.message);
+        return;
+      }
+      setResult(await parseInventoryCsv(selected));
+    } catch {
+      setFileError("We couldn't open this file. Try selecting it again or choose a different CSV.");
+    } finally {
+      busy.current = false;
+      setPhase("parsed");
     }
-    const parsed = await parseInventoryCsv(f);
-    setProgress(100);
-    setResult(parsed);
-    setPhase("parsed");
   };
 
-  const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (f) void handleFile(f);
+  const onInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = event.target.files?.[0];
+    event.target.value = "";
+    if (selected) void readFile(selected.name, async () => selected);
   };
 
-  const onDrop = (e: React.DragEvent) => {
-    e.preventDefault();
+  const onDrop = (event: React.DragEvent) => {
+    event.preventDefault();
     setDragOver(false);
-    const f = e.dataTransfer.files?.[0];
-    if (f) void handleFile(f);
-  };
-
-  const loadSample = async (name: string) => {
-    const f = await loadSampleCsv(name);
-    void handleFile(f);
+    const selected = event.dataTransfer.files?.[0];
+    if (phase === "idle" && selected) void readFile(selected.name, async () => selected);
   };
 
   const confirm = async () => {
-    if (!result?.ok) return;
+    if (!result?.ok || busy.current) return;
+    busy.current = true;
+    setImportFailed(false);
     setPhase("importing");
-    await latency(700);
-    await onImport(result);
-    setPhase("imported");
+    try {
+      await onImport(result);
+      setPhase("imported");
+    } catch {
+      setImportFailed(true);
+      setPhase("parsed");
+    } finally {
+      busy.current = false;
+    }
   };
 
   const issues = fileError ? [{ message: fileError }] : (result?.issues ?? []);
@@ -131,18 +146,20 @@ export function CSVUploader({ onImport, successActions, confirmLabel = "Confirm 
 
   return (
     <div className={cn("space-y-4", className)}>
-      {/* Live region announces state changes to assistive tech */}
-      <p id={statusId} className="sr-only" aria-live="polite">
-        {phase === "reading" && `Reading ${file?.name}`}
-        {phase === "parsed" && !hasErrors && result && `${result.rows.length} records ready to import`}
-        {phase === "imported" && "Inventory data imported successfully."}
-      </p>
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".csv,text/csv"
+        hidden
+        aria-label="Inventory CSV file"
+        onChange={onInputChange}
+      />
 
       {(phase === "idle" || phase === "reading") && (
         <div
           onDragOver={(e) => {
             e.preventDefault();
-            setDragOver(true);
+            if (phase === "idle") setDragOver(true);
           }}
           onDragLeave={() => setDragOver(false)}
           onDrop={onDrop}
@@ -155,8 +172,7 @@ export function CSVUploader({ onImport, successActions, confirmLabel = "Confirm 
             <div className="w-full max-w-sm space-y-3" role="status">
               <FileSpreadsheet className="mx-auto size-8 text-primary" aria-hidden="true" />
               <p className="text-sm font-medium">Reading {file?.name}…</p>
-              <Progress value={progress} aria-label="Upload progress" />
-              <p className="text-xs text-muted-foreground tabular">{progress}% · parsed locally in your browser</p>
+              <p className="text-xs text-muted-foreground">Checking the file in your browser</p>
             </div>
           ) : (
             <>
@@ -166,21 +182,11 @@ export function CSVUploader({ onImport, successActions, confirmLabel = "Confirm 
               <p className="text-sm font-semibold">Drag and drop your inventory CSV here</p>
               <p className="mt-1 text-xs text-muted-foreground">CSV only · up to {formatBytes(MAX_CSV_BYTES)} · first 10 rows are previewed before import</p>
               <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-                <Button type="button" onClick={() => inputRef.current?.click()}>
+                <Button ref={chooseFileRef} type="button" onClick={() => inputRef.current?.click()}>
                   <FileSpreadsheet /> Choose file
                 </Button>
-                {!hideSamples && <SampleMenu onPick={loadSample} />}
+                {!hideSamples && <SampleMenu onPick={(name) => void readFile(name, () => loadSampleCsv(name))} />}
               </div>
-              <input
-                ref={inputRef}
-                id={inputId}
-                type="file"
-                accept=".csv,text/csv"
-                className="sr-only"
-                tabIndex={-1}
-                aria-label="Inventory CSV file"
-                onChange={onInputChange}
-              />
             </>
           )}
         </div>
@@ -188,7 +194,13 @@ export function CSVUploader({ onImport, successActions, confirmLabel = "Confirm 
 
       {(phase === "parsed" || phase === "importing") && file && (
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3">
+          <div
+            ref={hasErrors || importFailed ? undefined : outcomeRef}
+            tabIndex={-1}
+            role="group"
+            aria-label="Inventory CSV preview"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3"
+          >
             <div className="flex min-w-0 items-center gap-3">
               <span
                 className={cn(
@@ -220,7 +232,7 @@ export function CSVUploader({ onImport, successActions, confirmLabel = "Confirm 
           </div>
 
           {hasErrors && (
-            <div role="alert" className="rounded-lg border border-destructive/25 bg-destructive-soft p-4">
+            <div ref={outcomeRef} tabIndex={-1} role="alert" className="rounded-lg border border-destructive/25 bg-destructive-soft p-4">
               <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <XCircle className="size-4 text-destructive-text" aria-hidden="true" />
                 {issues[0].message}
@@ -235,7 +247,7 @@ export function CSVUploader({ onImport, successActions, confirmLabel = "Confirm 
               )}
               <p className="mt-3 text-sm text-muted-foreground">Fix the file in your spreadsheet app, save it as CSV, and upload it again.</p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <Button size="sm" onClick={() => { reset(); setTimeout(() => inputRef.current?.click(), 0); }}>
+                <Button size="sm" onClick={() => inputRef.current?.click()}>
                   <UploadCloud /> Upload corrected file
                 </Button>
                 <Button size="sm" variant="outline" onClick={reset}>
@@ -323,6 +335,14 @@ export function CSVUploader({ onImport, successActions, confirmLabel = "Confirm 
             </div>
           )}
 
+          {phase === "importing" && <p role="status" className="sr-only">Importing inventory records.</p>}
+
+          {importFailed && (
+            <Alert ref={outcomeRef} tabIndex={-1} role="alert" variant="destructive" title="Inventory import failed">
+              Your file is still available. Try confirming the import again.
+            </Alert>
+          )}
+
           {result?.ok && (
             <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 p-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-muted-foreground">
@@ -350,7 +370,7 @@ export function CSVUploader({ onImport, successActions, confirmLabel = "Confirm 
       )}
 
       {phase === "imported" && result && (
-        <Alert variant="success" title="Inventory data imported successfully.">
+        <Alert ref={outcomeRef} tabIndex={-1} variant="success" title="Inventory data imported successfully.">
           {formatNumber(result.rows.length)} records for {result.productCount} products from <strong>{result.fileName}</strong> were added to
           your inventory. Forecasts and order recommendations have been recalculated.
           <div className="mt-3 flex flex-wrap gap-2">

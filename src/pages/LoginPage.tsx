@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -23,8 +23,8 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 const HIGHLIGHTS = [
-  { icon: Footprints, title: "Aisle traffic from existing CCTV", body: "Aisle visits, dwell time and peak hours from footage you already record." },
-  { icon: TrendingUp, title: "Demand forecasts", body: "Product-level forecasts from historical sales CSVs, compared across models." },
+  { icon: Footprints, title: "Sample aisle traffic", body: "Explore aisle visits, dwell time and peak hours in a sample store." },
+  { icon: TrendingUp, title: "Demand forecasts", body: "Try a simulated forecast based on sample sales history." },
   { icon: Boxes, title: "Order recommendations", body: "Suggested order quantities with a transparent, editable calculation." },
 ];
 
@@ -84,8 +84,12 @@ export default function LoginPage() {
         <BrandMark />
         <main className="flex flex-1 items-center justify-center py-10">
           <div className="w-full max-w-[400px]">
-            <h1 className="text-page-title">Sign in to your store</h1>
-            <p className="mt-1.5 text-sm text-muted-foreground">Monitor customer traffic, inventory performance and demand forecasts.</p>
+            <h1 className="text-page-title">Sign in to the demo</h1>
+            <p className="mt-1.5 text-sm text-muted-foreground">Try aisle analytics, inventory imports, and reorder calculations with sample data.</p>
+
+            {import.meta.env.VITE_STORE_INVENTORY === "1" && (
+              <Link className="mt-3 inline-block underline" to="/store-inventory">Sign in to store inventory</Link>
+            )}
 
             {/* Demo account */}
             <div className="mt-6 rounded-xl border border-primary/20 bg-primary-soft p-4">
